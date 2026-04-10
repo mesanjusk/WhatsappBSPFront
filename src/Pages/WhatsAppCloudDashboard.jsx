@@ -348,6 +348,10 @@ export default function WhatsAppCloudDashboard() {
           <ListItemIcon><SettingsRoundedIcon fontSize="small" /></ListItemIcon>
           <ListItemText primary="Settings" />
         </MenuItem>
+        <MenuItem onClick={() => { setActiveTab('analytics'); setMobileMenuAnchorEl(null); }}>
+          <ListItemIcon><QueryStatsRoundedIcon fontSize="small" /></ListItemIcon>
+          <ListItemText primary="Analytics" />
+        </MenuItem>
         <MenuItem disabled sx={{ opacity: '1 !important' }}>
           <ListItemText primary={lastSyncLabel} primaryTypographyProps={{ variant: 'caption', color: 'text.secondary' }} />
         </MenuItem>
