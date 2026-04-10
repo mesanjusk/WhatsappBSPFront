@@ -74,6 +74,9 @@ export default function ConversationList({
           p: 1.1,
           borderBottom: '1px solid #e9edef',
           bgcolor: '#f0f2f5',
+          position: 'sticky',
+          top: 0,
+          zIndex: 2,
         }}
       >
         <Stack direction="row" alignItems="center" justifyContent="space-between">
@@ -187,7 +190,7 @@ export default function ConversationList({
                   selected={isActive}
                   onClick={() => onSelectConversation(conversation.id)}
                   sx={{
-                    py: 1,
+                    py: { xs: 1.35, md: 1 },
                     px: 1.2,
                     alignItems: 'flex-start',
                     borderBottom: '1px solid #f0f2f5',
