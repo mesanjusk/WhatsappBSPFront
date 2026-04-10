@@ -184,7 +184,7 @@ export default function AddCustomer({ onClose }) {
         <Paper sx={compactCardSx}>
           <Stack spacing={1.2}>
             <Typography variant="h6" fontWeight={700}>Add Customer / Party</Typography>
-            <Typography variant="caption" color="text.secondary">One record can work as customer, vendor, or both.</Typography>
+            <Typography variant="caption" color="text.secondary">One record can work as customer vendor, or both.</Typography>
 
             <TextField
               label="Customer / Party Name"
