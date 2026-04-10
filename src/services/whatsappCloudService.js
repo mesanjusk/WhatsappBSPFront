@@ -53,6 +53,9 @@ const WHATSAPP_ACCOUNT_ENDPOINTS = {
   list: ['/api/whatsapp/accounts'],
   connectConfig: ['/api/whatsapp/connect/config'],
   connectComplete: ['/api/whatsapp/connect/complete'],
+  connectManual: ['/api/whatsapp/connect/manual'],
+  disconnect: ['/api/whatsapp/account/:id', '/api/whatsapp/accounts/:id'],
+  revalidate: ['/api/whatsapp/account/:id/revalidate', '/api/whatsapp/accounts/:id/revalidate'],
 };
 
 const tryAutoReplyEndpoints = async (requestFactory) => {
@@ -99,10 +102,26 @@ export const completeWhatsAppConnect = (payload) =>
       },
     })
   );
+export const connectWhatsAppManual = (payload) =>
+  tryEndpoints(WHATSAPP_ACCOUNT_ENDPOINTS.connectManual, (endpoint) =>
+    apiClient.post(endpoint, payload, {
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    })
+  );
 export const activateWhatsAppAccount = (accountId) =>
   apiClient.post(`/api/whatsapp/accounts/${accountId}/activate`);
 export const disconnectWhatsAppAccount = (accountId) =>
-  apiClient.delete(`/api/whatsapp/account/${accountId}`);
+  tryEndpoints(
+    WHATSAPP_ACCOUNT_ENDPOINTS.disconnect.map((endpoint) => endpoint.replace(':id', accountId)),
+    (endpoint) => apiClient.delete(endpoint)
+  );
+export const revalidateWhatsAppAccount = (accountId) =>
+  tryEndpoints(
+    WHATSAPP_ACCOUNT_ENDPOINTS.revalidate.map((endpoint) => endpoint.replace(':id', accountId)),
+    (endpoint) => apiClient.post(endpoint)
+  );
 
 export const fetchWhatsAppMessages = () => apiClient.get('/api/whatsapp/messages');
 
@@ -219,8 +238,10 @@ export const whatsappCloudService = {
   getAccounts: fetchWhatsAppAccounts,
   getConnectConfig: fetchWhatsAppConnectConfig,
   completeConnect: completeWhatsAppConnect,
+  connectManual: connectWhatsAppManual,
   activateAccount: activateWhatsAppAccount,
   disconnectAccount: disconnectWhatsAppAccount,
+  revalidateAccount: revalidateWhatsAppAccount,
   getAutoReplyRules,
   createAutoReplyRule,
   updateAutoReplyRule,

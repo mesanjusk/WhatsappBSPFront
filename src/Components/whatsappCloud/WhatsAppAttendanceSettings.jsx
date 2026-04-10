@@ -19,6 +19,10 @@ export default function WhatsAppAttendanceSettings({
   onConnect,
   onDisconnect,
   onRefreshAccount,
+  onManualConnect,
+  onReconnect,
+  whatsappAccountStatus,
+  accountConnectionMode,
   accountActionLoading,
 }) {
   const [form, setForm] = useState(defaultConfig);
@@ -75,6 +79,14 @@ export default function WhatsAppAttendanceSettings({
                 ? `${whatsappAccount?.verified_name || whatsappAccount?.display_name || 'Business account'} • ${whatsappAccount?.phone_number || whatsappAccount?.display_phone_number || 'Number unavailable'}`
                 : 'Connect your WhatsApp account to enable chats, templates, and broadcast.'}
             </Typography>
+            {(whatsappAccountStatus || accountConnectionMode) ? (
+              <Typography variant="caption" color="text.secondary">
+                {[
+                  whatsappAccountStatus ? `Status: ${whatsappAccountStatus}` : null,
+                  accountConnectionMode ? `Mode: ${accountConnectionMode}` : null,
+                ].filter(Boolean).join(' • ')}
+              </Typography>
+            ) : null}
           </Stack>
         </Alert>
 
@@ -83,8 +95,16 @@ export default function WhatsAppAttendanceSettings({
             {isAccountLoading ? 'Checking...' : 'Refresh account'}
           </Button>
           <Button variant="contained" onClick={onConnect} disabled={accountActionLoading}>
-            {isAccountConnected ? 'Reconnect account' : 'Connect account'}
+            Connect with Meta
           </Button>
+          <Button variant="text" onClick={onManualConnect} disabled={accountActionLoading}>
+            Connect manually
+          </Button>
+          {whatsappAccount?.id ? (
+            <Button variant="outlined" onClick={onReconnect} disabled={accountActionLoading}>
+              Reconnect
+            </Button>
+          ) : null}
           {isAccountConnected && whatsappAccount?.id ? (
             <Button color="error" variant="text" onClick={() => onDisconnect(whatsappAccount.id)} disabled={accountActionLoading}>
               Disconnect
@@ -128,6 +148,10 @@ WhatsAppAttendanceSettings.propTypes = {
   onConnect: PropTypes.func,
   onDisconnect: PropTypes.func,
   onRefreshAccount: PropTypes.func,
+  onManualConnect: PropTypes.func,
+  onReconnect: PropTypes.func,
+  whatsappAccountStatus: PropTypes.string,
+  accountConnectionMode: PropTypes.string,
   accountActionLoading: PropTypes.bool,
 };
 
@@ -138,5 +162,9 @@ WhatsAppAttendanceSettings.defaultProps = {
   onConnect: () => {},
   onDisconnect: () => {},
   onRefreshAccount: () => {},
+  onManualConnect: () => {},
+  onReconnect: () => {},
+  whatsappAccountStatus: '',
+  accountConnectionMode: '',
   accountActionLoading: false,
 };

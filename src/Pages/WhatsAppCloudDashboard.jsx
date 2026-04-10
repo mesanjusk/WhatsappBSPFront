@@ -9,6 +9,10 @@ import {
   Chip,
   CircularProgress,
   Divider,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   IconButton,
   InputAdornment,
   List,
@@ -37,10 +41,13 @@ import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded';
 import MoreVertRoundedIcon from '@mui/icons-material/MoreVertRounded';
 import { toast } from '../Components/Toast';
 import {
+  connectWhatsAppManual,
   completeWhatsAppConnect,
+  fetchWhatsAppConnectConfig,
   disconnectWhatsAppAccount,
   fetchWhatsAppAccount,
   fetchWhatsAppStatus,
+  revalidateWhatsAppAccount,
 } from '../services/whatsappCloudService';
 import { parseApiError } from '../utils/parseApiError';
 import { ErrorState, LoadingSkeleton } from '../Components/ui';
@@ -117,9 +124,19 @@ export default function WhatsAppCloudDashboard() {
   const [lastCheckedAt, setLastCheckedAt] = useState(null);
   const [statusTick, setStatusTick] = useState(0);
   const [whatsappAccount, setWhatsappAccount] = useState(null);
+  const [whatsappAccountStatus, setWhatsappAccountStatus] = useState('loading');
   const [isAccountLoading, setIsAccountLoading] = useState(true);
   const [isAccountActionLoading, setIsAccountActionLoading] = useState(false);
   const [mobileMenuAnchorEl, setMobileMenuAnchorEl] = useState(null);
+  const [manualDialogOpen, setManualDialogOpen] = useState(false);
+  const [manualForm, setManualForm] = useState({
+    accessToken: '',
+    phoneNumberId: '',
+    businessAccountId: '',
+    displayPhoneNumber: '',
+    verifiedName: '',
+  });
+  const [manualFormError, setManualFormError] = useState('');
   const { userName, userGroup, mobileNumber } = useAuth();
   const outletContext = useOutletContext() || {};
 
@@ -127,14 +144,18 @@ export default function WhatsAppCloudDashboard() {
     setIsAccountLoading(true);
     try {
       const response = await fetchWhatsAppAccount();
-      setWhatsappAccount(getAccountPayload(response));
+      const account = getAccountPayload(response);
+      setWhatsappAccount(account);
+      setWhatsappAccountStatus(account?.status || (account ? 'connected' : 'not_connected'));
     } catch (error) {
       const statusCode = error?.response?.status;
       if (statusCode === 404 || statusCode === 204) {
         setWhatsappAccount(null);
+        setWhatsappAccountStatus('not_connected');
         return;
       }
       setWhatsappAccount(null);
+      setWhatsappAccountStatus('error');
       toast.error(parseApiError(error, 'Unable to load WhatsApp account.'));
     } finally {
       setIsAccountLoading(false);
@@ -182,17 +203,35 @@ export default function WhatsAppCloudDashboard() {
   }, [statusTick]);
 
   const isAccountConnected = connectionState === 'connected' && Boolean(whatsappAccount);
+  const accountConnectionMode = whatsappAccount?.connection_mode || whatsappAccount?.connectionMode || null;
 
   const handleConnectFlow = useCallback(async () => {
     setIsAccountActionLoading(true);
     try {
+      const configResponse = await fetchWhatsAppConnectConfig();
+      const config = configResponse?.data?.data || configResponse?.data || {};
       let payload = {};
-      if (typeof window !== 'undefined') {
+
+      if (typeof window !== 'undefined' && typeof window.FB?.login === 'function' && config?.configId) {
+        const loginResponse = await new Promise((resolve) => {
+          window.FB.login(resolve, {
+            config_id: config.configId,
+            response_type: 'code',
+            override_default_response_type: true,
+            extras: {
+              setup: {},
+            },
+          });
+        });
+
+        const authCode = loginResponse?.authResponse?.code;
+        if (!authCode) throw new Error('Meta Embedded Signup did not return an authorization code.');
+        payload = { code: authCode, flow: 'embedded_signup' };
+      } else if (typeof window !== 'undefined') {
         const signupToken = window.prompt('Paste signup token/code from Meta Embedded Signup');
         if (!signupToken) return;
-        payload = { signupToken };
+        payload = { signupToken, flow: 'embedded_signup' };
       }
-
       await completeWhatsAppConnect(payload);
       await loadAccount();
       setStatusTick((prev) => prev + 1);
@@ -219,23 +258,79 @@ export default function WhatsAppCloudDashboard() {
     }
   }, [loadAccount]);
 
+  const handleReconnect = useCallback(async () => {
+    if (!whatsappAccount?.id) return;
+    setIsAccountActionLoading(true);
+    try {
+      await revalidateWhatsAppAccount(whatsappAccount.id);
+      await loadAccount();
+      setStatusTick((prev) => prev + 1);
+      toast.success('WhatsApp account revalidated.');
+    } catch (error) {
+      toast.error(parseApiError(error, 'Could not revalidate account.'));
+    } finally {
+      setIsAccountActionLoading(false);
+    }
+  }, [loadAccount, whatsappAccount?.id]);
+
+  const resetManualForm = useCallback(() => {
+    setManualForm({
+      accessToken: '',
+      phoneNumberId: '',
+      businessAccountId: '',
+      displayPhoneNumber: '',
+      verifiedName: '',
+    });
+    setManualFormError('');
+  }, []);
+
+  const handleManualConnect = useCallback(async () => {
+    if (!manualForm.accessToken || !manualForm.phoneNumberId || !manualForm.businessAccountId) {
+      setManualFormError('Access token, Phone number ID, and Business account ID are required.');
+      return;
+    }
+    setManualFormError('');
+    setIsAccountActionLoading(true);
+    try {
+      await connectWhatsAppManual({
+        accessToken: manualForm.accessToken,
+        phoneNumberId: manualForm.phoneNumberId,
+        businessAccountId: manualForm.businessAccountId,
+        displayPhoneNumber: manualForm.displayPhoneNumber || undefined,
+        verifiedName: manualForm.verifiedName || undefined,
+      });
+      setManualDialogOpen(false);
+      resetManualForm();
+      await loadAccount();
+      setStatusTick((prev) => prev + 1);
+      toast.success('WhatsApp account connected manually.');
+    } catch (error) {
+      setManualFormError(parseApiError(error, 'Could not connect account manually.'));
+    } finally {
+      setIsAccountActionLoading(false);
+    }
+  }, [loadAccount, manualForm, resetManualForm]);
+
   const sectionNode = useMemo(() => {
     if (!isAccountConnected && activeTab !== 'settings') {
       return (
         <Stack alignItems="center" justifyContent="center" spacing={1.5} sx={{ height: '100%', minHeight: 260, textAlign: 'center', px: 3 }}>
           <Typography variant="h6" fontWeight={700}>
-            Connect your WhatsApp account to start using the dashboard
+            Connect your WhatsApp account
           </Typography>
           <Typography variant="body2" color="text.secondary">
             This workspace is account-aware. Connect your own number to load chats, templates, and broadcasts.
           </Typography>
           <Stack direction="row" spacing={1.25}>
-            <Button variant="contained" onClick={handleConnectFlow} disabled={isAccountActionLoading}>
-              {isAccountActionLoading ? 'Connecting...' : 'Connect account'}
-            </Button>
-            <Button variant="outlined" onClick={() => { loadAccount(); setStatusTick((prev) => prev + 1); }} disabled={isAccountLoading}>
-              Refresh status
-            </Button>
+              <Button variant="contained" onClick={handleConnectFlow} disabled={isAccountActionLoading}>
+              {isAccountActionLoading ? 'Connecting...' : 'Connect with Meta'}
+              </Button>
+              <Button variant="text" onClick={() => setManualDialogOpen(true)} disabled={isAccountActionLoading}>
+                Connect manually
+              </Button>
+              <Button variant="outlined" onClick={() => { loadAccount(); setStatusTick((prev) => prev + 1); }} disabled={isAccountLoading}>
+                Refresh status
+              </Button>
           </Stack>
         </Stack>
       );
@@ -254,6 +349,10 @@ export default function WhatsAppCloudDashboard() {
         onConnect={handleConnectFlow}
         onDisconnect={handleDisconnect}
         onRefreshAccount={loadAccount}
+        onManualConnect={() => setManualDialogOpen(true)}
+        onReconnect={handleReconnect}
+        whatsappAccountStatus={whatsappAccountStatus}
+        accountConnectionMode={accountConnectionMode}
         accountActionLoading={isAccountActionLoading}
       />
     );
@@ -265,7 +364,10 @@ export default function WhatsAppCloudDashboard() {
     isAccountConnected,
     isAccountLoading,
     loadAccount,
+    handleReconnect,
     search,
+    whatsappAccountStatus,
+    accountConnectionMode,
     whatsappAccount,
   ]);
 
@@ -473,8 +575,18 @@ export default function WhatsAppCloudDashboard() {
         </MenuItem>
         <MenuItem onClick={() => { handleConnectFlow(); setMobileMenuAnchorEl(null); }}>
           <ListItemIcon><SettingsRoundedIcon fontSize="small" /></ListItemIcon>
-          <ListItemText primary={isAccountConnected ? 'Reconnect account' : 'Connect account'} />
+          <ListItemText primary="Connect with Meta" />
         </MenuItem>
+        <MenuItem onClick={() => { setManualDialogOpen(true); setMobileMenuAnchorEl(null); }}>
+          <ListItemIcon><SettingsRoundedIcon fontSize="small" /></ListItemIcon>
+          <ListItemText primary="Connect manually" />
+        </MenuItem>
+        {whatsappAccount?.id ? (
+          <MenuItem onClick={() => { handleReconnect(); setMobileMenuAnchorEl(null); }}>
+            <ListItemIcon><RefreshRoundedIcon fontSize="small" /></ListItemIcon>
+            <ListItemText primary="Reconnect account" />
+          </MenuItem>
+        ) : null}
         {isAccountConnected && whatsappAccount?.id ? (
           <MenuItem onClick={() => { handleDisconnect(whatsappAccount.id); setMobileMenuAnchorEl(null); }}>
             <ListItemIcon><LogoutRoundedIcon fontSize="small" /></ListItemIcon>
@@ -499,6 +611,50 @@ export default function WhatsAppCloudDashboard() {
           <ListItemText primary="Logout" />
         </MenuItem>
       </Menu>
+
+      <Dialog open={manualDialogOpen} onClose={() => { setManualDialogOpen(false); resetManualForm(); }} fullWidth maxWidth="sm">
+        <DialogTitle>Connect manually</DialogTitle>
+        <DialogContent>
+          <Stack spacing={1.5} sx={{ mt: 1 }}>
+            <TextField
+              required
+              label="Access token"
+              type="password"
+              value={manualForm.accessToken}
+              onChange={(event) => setManualForm((prev) => ({ ...prev, accessToken: event.target.value }))}
+            />
+            <TextField
+              required
+              label="Phone number ID"
+              value={manualForm.phoneNumberId}
+              onChange={(event) => setManualForm((prev) => ({ ...prev, phoneNumberId: event.target.value }))}
+            />
+            <TextField
+              required
+              label="Business account ID / WABA ID"
+              value={manualForm.businessAccountId}
+              onChange={(event) => setManualForm((prev) => ({ ...prev, businessAccountId: event.target.value }))}
+            />
+            <TextField
+              label="Display phone number (optional)"
+              value={manualForm.displayPhoneNumber}
+              onChange={(event) => setManualForm((prev) => ({ ...prev, displayPhoneNumber: event.target.value }))}
+            />
+            <TextField
+              label="Verified name (optional)"
+              value={manualForm.verifiedName}
+              onChange={(event) => setManualForm((prev) => ({ ...prev, verifiedName: event.target.value }))}
+            />
+            {manualFormError ? <Typography variant="caption" color="error">{manualFormError}</Typography> : null}
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => { setManualDialogOpen(false); resetManualForm(); }}>Cancel</Button>
+          <Button onClick={handleManualConnect} variant="contained" disabled={isAccountActionLoading}>
+            {isAccountActionLoading ? 'Connecting...' : 'Connect'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
