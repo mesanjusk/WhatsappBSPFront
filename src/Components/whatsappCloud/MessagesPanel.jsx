@@ -61,7 +61,6 @@ export default function MessagesPanel({ search: externalSearch }) {
   const [messages, setMessages] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
-  const [search, setSearch] = useState(externalSearch || '');
   const [activeConversationId, setActiveConversationId] = useState('');
   const [readCutoffByConversation, setReadCutoffByConversation] = useState({});
   const [showConversationList, setShowConversationList] = useState(true);
@@ -102,7 +101,6 @@ export default function MessagesPanel({ search: externalSearch }) {
     }
   }, []);
 
-  useEffect(() => setSearch(externalSearch || ''), [externalSearch]);
   useEffect(() => { loadMessages(); }, [loadMessages]);
   useEffect(() => {
     if (!SOCKET_URL || typeof io !== 'function') return undefined;
@@ -157,10 +155,10 @@ export default function MessagesPanel({ search: externalSearch }) {
   }, [activeConversationId, draftConversation, orderedMessages, readCutoffByConversation]);
 
   const filteredConversations = useMemo(() => {
-    const searchValue = search.trim().toLowerCase();
+    const searchValue = externalSearch.trim().toLowerCase();
     if (!searchValue) return conversations;
     return conversations.filter((conversation) => `${conversation.displayName} ${conversation.contact}`.toLowerCase().includes(searchValue));
-  }, [conversations, search]);
+  }, [conversations, externalSearch]);
 
   useEffect(() => {
     if (!conversations.length) return setActiveConversationId('');
@@ -223,7 +221,7 @@ export default function MessagesPanel({ search: externalSearch }) {
 
   return (
     <WhatsAppLayout
-      sidebar={<Box sx={{ display: { xs: showConversationList ? 'block' : 'none', lg: 'block' }, height: '100%' }}><ConversationList conversations={filteredConversations} activeConversationId={activeConversationId} onSelectConversation={(id) => { markConversationAsRead(id); setActiveConversationId(id); setShowConversationList(false); }} onRefresh={loadMessages} search={search} onSearch={setSearch} onSelectCustomer={(value) => { const contact = typeof value === 'string' ? value.trim() : value?.mobile; const conversation = toConversationFromContact({ contact }); if (!conversation.id) return; setDraftConversation(conversation); markConversationAsRead(conversation.id); setActiveConversationId(conversation.id); setShowConversationList(false); }} /></Box>}
+      sidebar={<Box sx={{ display: { xs: showConversationList ? 'block' : 'none', lg: 'block' }, height: '100%' }}><ConversationList conversations={filteredConversations} activeConversationId={activeConversationId} onSelectConversation={(id) => { markConversationAsRead(id); setActiveConversationId(id); setShowConversationList(false); }} onRefresh={loadMessages} onSelectCustomer={(value) => { const contact = typeof value === 'string' ? value.trim() : value?.mobile; const conversation = toConversationFromContact({ contact }); if (!conversation.id) return; setDraftConversation(conversation); markConversationAsRead(conversation.id); setActiveConversationId(conversation.id); setShowConversationList(false); }} /></Box>}
       main={<Box sx={{ display: { xs: showConversationList ? 'none' : 'block', lg: 'block' }, height: '100%', minHeight: 0 }}>{activeConversation ? <Stack sx={{ height: '100%', minHeight: 0 }}><ChatHeader conversation={activeConversation} isLoading={isLoading} onRefresh={loadMessages} windowOpen={conversationWindowOpen} onBack={() => setShowConversationList(true)} /><ChatWindow messages={activeMessages} getMessageIdentity={getMessageIdentity} getMessageDirection={getMessageDirection} getTimestampRaw={getTimestampRaw} scrollRef={messagesContainerRef} canSend={Boolean(activeConversation) && !isSending && conversationWindowOpen} canSendTemplateOnly={is24hExpired} recipient={activeConversation?.contact || ''} onSend={handleSend} onSendAttachment={handleSendAttachment} /></Stack> : <EmptyState title="Select a conversation" description="Choose a chat from the left panel to start messaging." />}</Box>}
       details={activeConversation ? <Stack spacing={2} sx={{ p: 2 }}><Stack alignItems="center" spacing={1}><Avatar sx={{ width: 64, height: 64, bgcolor: '#16a34a' }}>{(activeConversation.displayName || activeConversation.contact || 'NA').slice(0, 2).toUpperCase()}</Avatar><Typography variant="subtitle1" fontWeight={700} align="center">{activeConversation.displayName}</Typography><Typography variant="caption" color="text.secondary" align="center">{activeConversation.secondaryLabel || activeConversation.contact}</Typography></Stack><Divider /><Stack direction="row" spacing={1} alignItems="center"><InfoOutlinedIcon fontSize="small" color="action" /><Typography variant="body2" color="text.secondary">24h window: {conversationWindowOpen ? 'Active' : 'Expired'}</Typography></Stack></Stack> : null}
     />

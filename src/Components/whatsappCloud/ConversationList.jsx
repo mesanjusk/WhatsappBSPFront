@@ -1,4 +1,3 @@
-import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
 import SyncRoundedIcon from '@mui/icons-material/SyncRounded';
 import DoneAllRoundedIcon from '@mui/icons-material/DoneAllRounded';
 import PropTypes from 'prop-types';
@@ -8,7 +7,6 @@ import {
   Badge,
   Box,
   IconButton,
-  InputAdornment,
   List,
   ListItemButton,
   ListItemText,
@@ -62,8 +60,6 @@ export default function ConversationList({
   activeConversationId,
   onSelectConversation,
   onSelectCustomer,
-  search,
-  onSearch,
   onRefresh,
 }) {
   return (
@@ -89,26 +85,6 @@ export default function ConversationList({
             </span>
           </Tooltip>
         </Stack>
-
-        <TextField
-          value={search}
-          size="small"
-          onChange={(event) => onSearch(event.target.value)}
-          placeholder="Search or start new chat"
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchRoundedIcon fontSize="small" />
-              </InputAdornment>
-            ),
-          }}
-          sx={{
-            '& .MuiOutlinedInput-root': {
-              borderRadius: 999,
-              bgcolor: '#ffffff',
-            },
-          }}
-        />
 
         <Autocomplete
           size="small"
@@ -259,8 +235,6 @@ ConversationList.propTypes = {
   activeConversationId: PropTypes.string,
   onSelectConversation: PropTypes.func.isRequired,
   onSelectCustomer: PropTypes.func.isRequired,
-  search: PropTypes.string,
-  onSearch: PropTypes.func.isRequired,
   onRefresh: PropTypes.func,
 };
 
@@ -269,6 +243,5 @@ ConversationList.defaultProps = {
   customerOptions: [],
   customerLoadError: '',
   activeConversationId: '',
-  search: '',
   onRefresh: undefined,
 };

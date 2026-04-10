@@ -1,11 +1,12 @@
 import { useState } from 'react';
+import PropTypes from 'prop-types';
 import { Box, Paper, Stack, TextField, Typography } from '@mui/material';
 import TemplateMessageComposer from './TemplateMessageComposer';
 import BulkSender from './BulkSender';
 
 const initialForm = { to: '' };
 
-export default function SendMessagePanel() {
+export default function SendMessagePanel({ search }) {
   const [form, setForm] = useState(initialForm);
 
   return (
@@ -28,7 +29,15 @@ export default function SendMessagePanel() {
         </Stack>
       </Paper>
 
-      <BulkSender />
+      <BulkSender search={search} />
     </Stack>
   );
 }
+
+SendMessagePanel.propTypes = {
+  search: PropTypes.string,
+};
+
+SendMessagePanel.defaultProps = {
+  search: '',
+};

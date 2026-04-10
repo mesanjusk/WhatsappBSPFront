@@ -7,15 +7,17 @@ import {
   Box,
   Chip,
   CircularProgress,
+  Divider,
   IconButton,
   InputAdornment,
   List,
   ListItemButton,
   ListItemIcon,
+  ListItemText,
+  Menu,
+  MenuItem,
   Paper,
   Stack,
-  Tab,
-  Tabs,
   TextField,
   Tooltip,
   Typography,
@@ -31,6 +33,7 @@ import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
 import QueryStatsRoundedIcon from '@mui/icons-material/QueryStatsRounded';
 import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded';
 import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded';
+import MoreVertRoundedIcon from '@mui/icons-material/MoreVertRounded';
 import { fetchWhatsAppStatus } from '../services/whatsappCloudService';
 import { parseApiError } from '../utils/parseApiError';
 import { ErrorState, LoadingSkeleton } from '../Components/ui';
@@ -52,7 +55,16 @@ const navItems = [
   { key: 'settings', label: 'Settings', icon: <SettingsRoundedIcon /> },
 ];
 
-const mobileTabs = navItems.filter((item) => item.key !== 'analytics');
+const mobileTabs = navItems.filter((item) => !['analytics', 'settings'].includes(item.key));
+
+const searchPlaceholderByTab = {
+  inbox: 'Search or start new chat',
+  templates: 'Search templates',
+  campaigns: 'Search broadcasts',
+  autoReply: 'Search auto replies',
+  analytics: 'Search analytics',
+  settings: 'Search settings',
+};
 
 const getFriendlyStatusError = (error) => {
   const statusCode = error?.response?.status;
@@ -89,7 +101,8 @@ export default function WhatsAppCloudDashboard() {
   const [statusError, setStatusError] = useState('');
   const [lastCheckedAt, setLastCheckedAt] = useState(null);
   const [statusTick, setStatusTick] = useState(0);
-  const { userName } = useAuth();
+  const [mobileMenuAnchorEl, setMobileMenuAnchorEl] = useState(null);
+  const { userName, userGroup, mobileNumber } = useAuth();
   const outletContext = useOutletContext() || {};
 
   useEffect(() => {
@@ -130,9 +143,9 @@ export default function WhatsAppCloudDashboard() {
 
   const sectionNode = useMemo(() => {
     if (activeTab === 'inbox') return <MessagesPanel search={search} />;
-    if (activeTab === 'templates') return <SendMessagePanel />;
-    if (activeTab === 'campaigns') return <BulkSender standalone />;
-    if (activeTab === 'autoReply') return <AutoReplyManagementPanel />;
+    if (activeTab === 'templates') return <SendMessagePanel search={search} />;
+    if (activeTab === 'campaigns') return <BulkSender standalone search={search} />;
+    if (activeTab === 'autoReply') return <AutoReplyManagementPanel search={search} />;
     if (activeTab === 'analytics') return <AnalyticsDashboard />;
     return <WhatsAppAttendanceSettings />;
   }, [activeTab, search]);
@@ -140,7 +153,13 @@ export default function WhatsAppCloudDashboard() {
   const connectionChipColor =
     connectionState === 'connected' ? 'success' : connectionState === 'loading' ? 'warning' : 'error';
 
-  const mobileTabValue = activeTab === 'analytics' ? 'settings' : activeTab;
+  const mobileMenuOpen = Boolean(mobileMenuAnchorEl);
+  const lastSyncLabel = lastCheckedAt
+    ? `Last sync ${lastCheckedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+    : 'Last sync pending';
+  const activeNavLabel = navItems.find((n) => n.key === activeTab)?.label || 'Chats';
+  const mobileTabValue = mobileTabs.some((item) => item.key === activeTab) ? activeTab : false;
+  const mobileUserMeta = userGroup || mobileNumber || 'No profile details';
 
   return (
     <Box
@@ -208,7 +227,7 @@ export default function WhatsAppCloudDashboard() {
           <Stack spacing={1}>
             <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
               <Typography variant="h6" fontWeight={700}>
-                {isMobile ? navItems.find((n) => n.key === activeTab)?.label || 'Chats' : 'WhatsApp Business Hub'}
+                {isMobile ? activeNavLabel : 'WhatsApp Business Hub'}
               </Typography>
               <Stack direction="row" spacing={1} alignItems="center">
                 <Chip
@@ -232,29 +251,23 @@ export default function WhatsAppCloudDashboard() {
                 >
                   <RefreshRoundedIcon fontSize="small" />
                 </IconButton>
+                {isMobile ? (
+                  <IconButton
+                    size="small"
+                    onClick={(event) => setMobileMenuAnchorEl(event.currentTarget)}
+                    sx={{ color: '#fff' }}
+                    aria-label="More options"
+                  >
+                    <MoreVertRoundedIcon fontSize="small" />
+                  </IconButton>
+                ) : null}
               </Stack>
             </Stack>
-
-            {isMobile && mobileTabValue === 'settings' ? (
-              <Tabs
-                value={activeTab === 'analytics' ? 'analytics' : 'settings'}
-                onChange={(_, value) => setActiveTab(value)}
-                sx={{
-                  minHeight: 30,
-                  '& .MuiTab-root': { minHeight: 30, color: 'rgba(255,255,255,0.85)', textTransform: 'none' },
-                  '& .MuiTab-root.Mui-selected': { color: '#fff', fontWeight: 700 },
-                  '& .MuiTabs-indicator': { backgroundColor: '#fff' },
-                }}
-              >
-                <Tab value="settings" label="Settings" />
-                <Tab value="analytics" label="Analytics" />
-              </Tabs>
-            ) : null}
 
             <TextField
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder={activeTab === 'inbox' ? 'Search chats' : 'Search in section'}
+              placeholder={searchPlaceholderByTab[activeTab] || 'Search'}
               size="small"
               sx={{
                 maxWidth: { lg: 430 },
@@ -271,11 +284,6 @@ export default function WhatsAppCloudDashboard() {
                 ),
               }}
             />
-            {lastCheckedAt ? (
-              <Typography variant="caption" sx={{ color: { xs: 'rgba(255,255,255,0.78)', lg: 'text.secondary' } }}>
-                Last sync {lastCheckedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </Typography>
-            ) : null}
           </Stack>
         </Paper>
 
@@ -319,6 +327,40 @@ export default function WhatsAppCloudDashboard() {
           </BottomNavigation>
         </Paper>
       ) : null}
+
+      <Menu
+        anchorEl={mobileMenuAnchorEl}
+        open={mobileMenuOpen}
+        onClose={() => setMobileMenuAnchorEl(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+      >
+        <MenuItem disabled sx={{ opacity: '1 !important', alignItems: 'flex-start', py: 1 }}>
+          <ListItemText
+            primary={userName || 'User'}
+            secondary={mobileUserMeta}
+            primaryTypographyProps={{ fontWeight: 700, variant: 'body2' }}
+            secondaryTypographyProps={{ variant: 'caption' }}
+          />
+        </MenuItem>
+        <Divider />
+        <MenuItem onClick={() => { setActiveTab('settings'); setMobileMenuAnchorEl(null); }}>
+          <ListItemIcon><SettingsRoundedIcon fontSize="small" /></ListItemIcon>
+          <ListItemText primary="Settings" />
+        </MenuItem>
+        <MenuItem onClick={() => { setActiveTab('analytics'); setMobileMenuAnchorEl(null); }}>
+          <ListItemIcon><QueryStatsRoundedIcon fontSize="small" /></ListItemIcon>
+          <ListItemText primary="Analytics" />
+        </MenuItem>
+        <MenuItem disabled sx={{ opacity: '1 !important' }}>
+          <ListItemText primary={lastSyncLabel} primaryTypographyProps={{ variant: 'caption', color: 'text.secondary' }} />
+        </MenuItem>
+        <Divider />
+        <MenuItem onClick={() => { setMobileMenuAnchorEl(null); outletContext.onLogout?.(); }}>
+          <ListItemIcon><LogoutRoundedIcon fontSize="small" /></ListItemIcon>
+          <ListItemText primary="Logout" />
+        </MenuItem>
+      </Menu>
     </Box>
   );
 }

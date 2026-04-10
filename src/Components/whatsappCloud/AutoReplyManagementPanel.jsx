@@ -15,10 +15,11 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
+import PropTypes from 'prop-types';
 import Modal from '../common/Modal';
 import { useAutoReplyManagement } from './hooks/useAutoReplyManagement';
 
-export default function AutoReplyManagementPanel() {
+export default function AutoReplyManagementPanel({ search }) {
   const {
     rules,
     fallbackReply,
@@ -41,6 +42,11 @@ export default function AutoReplyManagementPanel() {
     handleToggle,
     handleTest,
   } = useAutoReplyManagement();
+  const normalizedSearch = search.trim().toLowerCase();
+  const filteredRules = normalizedSearch
+    ? rules.filter((rule) =>
+      `${rule.keyword} ${rule.replyText} ${rule.templateName} ${rule.templateLanguage}`.toLowerCase().includes(normalizedSearch))
+    : rules;
 
   return (
     <Paper variant="outlined" sx={{ p: 2.5, borderRadius: { xs: 0, md: 3 }, height: '100%', overflow: 'auto' }}>
@@ -90,9 +96,9 @@ export default function AutoReplyManagementPanel() {
               {isLoading ? (
                 <TableRow><TableCell colSpan={4} align="center">Loading rules...</TableCell></TableRow>
               ) : null}
-              {!isLoading && rules.length === 0 ? (
+              {!isLoading && filteredRules.length === 0 ? (
                 <TableRow><TableCell colSpan={4} align="center">No auto-reply rules configured.</TableCell></TableRow>
-              ) : rules.map((rule) => (
+              ) : filteredRules.map((rule) => (
                 <TableRow key={rule.id}>
                   <TableCell>{rule.keyword} <Typography component="span" variant="caption">({rule.matchType})</Typography></TableCell>
                   <TableCell>{rule.replyMode === 'template' ? `Template: ${rule.templateName} · ${rule.templateLanguage}` : rule.replyText}</TableCell>
@@ -168,3 +174,11 @@ export default function AutoReplyManagementPanel() {
     </Paper>
   );
 }
+
+AutoReplyManagementPanel.propTypes = {
+  search: PropTypes.string,
+};
+
+AutoReplyManagementPanel.defaultProps = {
+  search: '',
+};

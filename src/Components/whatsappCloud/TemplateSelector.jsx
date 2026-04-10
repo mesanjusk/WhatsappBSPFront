@@ -28,8 +28,15 @@ const getVariableCount = (body) => {
   return Math.max(...numbers);
 };
 
-export default function TemplateSelector({ selectedTemplate, onTemplateChange, disabled = false }) {
+export default function TemplateSelector({ selectedTemplate, onTemplateChange, disabled = false, searchQuery = '' }) {
   const { templates, isLoading, error, isEmpty, refetchTemplates } = useTemplates();
+  const normalizedSearch = searchQuery.trim().toLowerCase();
+
+  const filteredTemplates = useMemo(() => {
+    if (!normalizedSearch) return templates;
+    return templates.filter((template) =>
+      `${template.name} ${template.language} ${template.category} ${template.body}`.toLowerCase().includes(normalizedSearch));
+  }, [normalizedSearch, templates]);
 
   const resolvedSelectedTemplate = useMemo(() => {
     if (!selectedTemplate?.name) return null;
@@ -100,7 +107,7 @@ export default function TemplateSelector({ selectedTemplate, onTemplateChange, d
             onChange={(event) => handleSelect(event.target.value)}
           >
             <MenuItem value=""><em>Select template</em></MenuItem>
-            {templates.map((template) => (
+            {filteredTemplates.map((template) => (
               <MenuItem
                 key={`${template.name}-${template.language}`}
                 value={JSON.stringify({ name: template.name, language: template.language })}
@@ -111,7 +118,7 @@ export default function TemplateSelector({ selectedTemplate, onTemplateChange, d
           </Select>
         </FormControl>
 
-        {isEmpty ? <Typography variant="caption" color="text.secondary" sx={{ mt: 1.5, display: 'block' }}>No templates found.</Typography> : null}
+        {(isEmpty || (!filteredTemplates.length && normalizedSearch)) ? <Typography variant="caption" color="text.secondary" sx={{ mt: 1.5, display: 'block' }}>No templates found.</Typography> : null}
         {isLoading ? <Typography variant="caption" color="text.secondary" sx={{ mt: 1.5, display: 'block' }}>Loading templates...</Typography> : null}
 
         {error ? (
@@ -160,9 +167,11 @@ TemplateSelector.propTypes = {
   }),
   onTemplateChange: PropTypes.func.isRequired,
   disabled: PropTypes.bool,
+  searchQuery: PropTypes.string,
 };
 
 TemplateSelector.defaultProps = {
   selectedTemplate: null,
   disabled: false,
+  searchQuery: '',
 };
