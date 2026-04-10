@@ -48,6 +48,13 @@ const AUTO_REPLY_ENDPOINTS = [
   '/api/whatsapp/auto-reply-rules',
 ];
 
+const WHATSAPP_ACCOUNT_ENDPOINTS = {
+  current: ['/api/whatsapp/account', '/api/whatsapp/accounts/active'],
+  list: ['/api/whatsapp/accounts'],
+  connectConfig: ['/api/whatsapp/connect/config'],
+  connectComplete: ['/api/whatsapp/connect/complete'],
+};
+
 const tryAutoReplyEndpoints = async (requestFactory) => {
   let lastError = null;
 
@@ -63,7 +70,39 @@ const tryAutoReplyEndpoints = async (requestFactory) => {
   throw lastError;
 };
 
+const tryEndpoints = async (endpoints, requestFactory) => {
+  let lastError = null;
+
+  for (const endpoint of endpoints) {
+    try {
+      return await requestFactory(endpoint);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError;
+};
+
 export const fetchWhatsAppStatus = () => apiClient.get('/api/whatsapp/status');
+export const fetchWhatsAppAccount = () =>
+  tryEndpoints(WHATSAPP_ACCOUNT_ENDPOINTS.current, (endpoint) => apiClient.get(endpoint));
+export const fetchWhatsAppAccounts = () =>
+  tryEndpoints(WHATSAPP_ACCOUNT_ENDPOINTS.list, (endpoint) => apiClient.get(endpoint));
+export const fetchWhatsAppConnectConfig = () =>
+  tryEndpoints(WHATSAPP_ACCOUNT_ENDPOINTS.connectConfig, (endpoint) => apiClient.get(endpoint));
+export const completeWhatsAppConnect = (payload) =>
+  tryEndpoints(WHATSAPP_ACCOUNT_ENDPOINTS.connectComplete, (endpoint) =>
+    apiClient.post(endpoint, payload, {
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    })
+  );
+export const activateWhatsAppAccount = (accountId) =>
+  apiClient.post(`/api/whatsapp/accounts/${accountId}/activate`);
+export const disconnectWhatsAppAccount = (accountId) =>
+  apiClient.delete(`/api/whatsapp/account/${accountId}`);
 
 export const fetchWhatsAppMessages = () => apiClient.get('/api/whatsapp/messages');
 
@@ -176,6 +215,12 @@ export const whatsappCloudService = {
   getMessages: fetchWhatsAppMessages,
   getTemplates: fetchWhatsAppTemplates,
   getStatus: fetchWhatsAppStatus,
+  getAccount: fetchWhatsAppAccount,
+  getAccounts: fetchWhatsAppAccounts,
+  getConnectConfig: fetchWhatsAppConnectConfig,
+  completeConnect: completeWhatsAppConnect,
+  activateAccount: activateWhatsAppAccount,
+  disconnectAccount: disconnectWhatsAppAccount,
   getAutoReplyRules,
   createAutoReplyRule,
   updateAutoReplyRule,
