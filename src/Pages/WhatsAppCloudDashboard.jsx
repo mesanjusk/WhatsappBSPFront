@@ -1,10 +1,11 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Avatar,
   Badge,
   BottomNavigation,
   BottomNavigationAction,
   Box,
+  Button,
   Chip,
   CircularProgress,
   Divider,
@@ -34,7 +35,13 @@ import QueryStatsRoundedIcon from '@mui/icons-material/QueryStatsRounded';
 import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded';
 import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded';
 import MoreVertRoundedIcon from '@mui/icons-material/MoreVertRounded';
-import { fetchWhatsAppStatus } from '../services/whatsappCloudService';
+import { toast } from '../Components/Toast';
+import {
+  completeWhatsAppConnect,
+  disconnectWhatsAppAccount,
+  fetchWhatsAppAccount,
+  fetchWhatsAppStatus,
+} from '../services/whatsappCloudService';
 import { parseApiError } from '../utils/parseApiError';
 import { ErrorState, LoadingSkeleton } from '../Components/ui';
 import { useAuth } from '../context/AuthContext';
@@ -74,6 +81,14 @@ const getFriendlyStatusError = (error) => {
   return parseApiError(error, 'Unable to check WhatsApp status right now.');
 };
 
+const getAccountPayload = (response) => {
+  const data = response?.data?.data ?? response?.data ?? null;
+  if (Array.isArray(data)) return data[0] || null;
+  if (Array.isArray(data?.items)) return data.items[0] || null;
+  if (data?.account) return data.account;
+  return data;
+};
+
 const SectionSurface = ({ children }) => (
   <Paper
     variant="outlined"
@@ -101,9 +116,34 @@ export default function WhatsAppCloudDashboard() {
   const [statusError, setStatusError] = useState('');
   const [lastCheckedAt, setLastCheckedAt] = useState(null);
   const [statusTick, setStatusTick] = useState(0);
+  const [whatsappAccount, setWhatsappAccount] = useState(null);
+  const [isAccountLoading, setIsAccountLoading] = useState(true);
+  const [isAccountActionLoading, setIsAccountActionLoading] = useState(false);
   const [mobileMenuAnchorEl, setMobileMenuAnchorEl] = useState(null);
   const { userName, userGroup, mobileNumber } = useAuth();
   const outletContext = useOutletContext() || {};
+
+  const loadAccount = useCallback(async () => {
+    setIsAccountLoading(true);
+    try {
+      const response = await fetchWhatsAppAccount();
+      setWhatsappAccount(getAccountPayload(response));
+    } catch (error) {
+      const statusCode = error?.response?.status;
+      if (statusCode === 404 || statusCode === 204) {
+        setWhatsappAccount(null);
+        return;
+      }
+      setWhatsappAccount(null);
+      toast.error(parseApiError(error, 'Unable to load WhatsApp account.'));
+    } finally {
+      setIsAccountLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadAccount();
+  }, [loadAccount]);
 
   useEffect(() => {
     let active = true;
@@ -141,14 +181,93 @@ export default function WhatsAppCloudDashboard() {
     };
   }, [statusTick]);
 
+  const isAccountConnected = connectionState === 'connected' && Boolean(whatsappAccount);
+
+  const handleConnectFlow = useCallback(async () => {
+    setIsAccountActionLoading(true);
+    try {
+      let payload = {};
+      if (typeof window !== 'undefined') {
+        const signupToken = window.prompt('Paste signup token/code from Meta Embedded Signup');
+        if (!signupToken) return;
+        payload = { signupToken };
+      }
+
+      await completeWhatsAppConnect(payload);
+      await loadAccount();
+      setStatusTick((prev) => prev + 1);
+      toast.success('WhatsApp account connected.');
+    } catch (error) {
+      toast.error(parseApiError(error, 'Could not complete WhatsApp connect.'));
+    } finally {
+      setIsAccountActionLoading(false);
+    }
+  }, [loadAccount]);
+
+  const handleDisconnect = useCallback(async (accountId) => {
+    if (!accountId) return;
+    setIsAccountActionLoading(true);
+    try {
+      await disconnectWhatsAppAccount(accountId);
+      await loadAccount();
+      setStatusTick((prev) => prev + 1);
+      toast.success('WhatsApp account disconnected.');
+    } catch (error) {
+      toast.error(parseApiError(error, 'Could not disconnect account.'));
+    } finally {
+      setIsAccountActionLoading(false);
+    }
+  }, [loadAccount]);
+
   const sectionNode = useMemo(() => {
+    if (!isAccountConnected && activeTab !== 'settings') {
+      return (
+        <Stack alignItems="center" justifyContent="center" spacing={1.5} sx={{ height: '100%', minHeight: 260, textAlign: 'center', px: 3 }}>
+          <Typography variant="h6" fontWeight={700}>
+            Connect your WhatsApp account to start using the dashboard
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            This workspace is account-aware. Connect your own number to load chats, templates, and broadcasts.
+          </Typography>
+          <Stack direction="row" spacing={1.25}>
+            <Button variant="contained" onClick={handleConnectFlow} disabled={isAccountActionLoading}>
+              {isAccountActionLoading ? 'Connecting...' : 'Connect account'}
+            </Button>
+            <Button variant="outlined" onClick={() => { loadAccount(); setStatusTick((prev) => prev + 1); }} disabled={isAccountLoading}>
+              Refresh status
+            </Button>
+          </Stack>
+        </Stack>
+      );
+    }
+
     if (activeTab === 'inbox') return <MessagesPanel search={search} />;
     if (activeTab === 'templates') return <SendMessagePanel search={search} />;
     if (activeTab === 'campaigns') return <BulkSender standalone search={search} />;
     if (activeTab === 'autoReply') return <AutoReplyManagementPanel search={search} />;
     if (activeTab === 'analytics') return <AnalyticsDashboard />;
-    return <WhatsAppAttendanceSettings />;
-  }, [activeTab, search]);
+    return (
+      <WhatsAppAttendanceSettings
+        whatsappAccount={whatsappAccount}
+        isAccountConnected={isAccountConnected}
+        isAccountLoading={isAccountLoading}
+        onConnect={handleConnectFlow}
+        onDisconnect={handleDisconnect}
+        onRefreshAccount={loadAccount}
+        accountActionLoading={isAccountActionLoading}
+      />
+    );
+  }, [
+    activeTab,
+    handleConnectFlow,
+    handleDisconnect,
+    isAccountActionLoading,
+    isAccountConnected,
+    isAccountLoading,
+    loadAccount,
+    search,
+    whatsappAccount,
+  ]);
 
   const connectionChipColor =
     connectionState === 'connected' ? 'success' : connectionState === 'loading' ? 'warning' : 'error';
@@ -343,6 +462,25 @@ export default function WhatsAppCloudDashboard() {
             secondaryTypographyProps={{ variant: 'caption' }}
           />
         </MenuItem>
+        <Divider />
+        <MenuItem disabled sx={{ opacity: '1 !important' }}>
+          <ListItemText
+            primary={isAccountConnected ? 'WhatsApp connected' : 'WhatsApp not connected'}
+            secondary={whatsappAccount?.phone_number || whatsappAccount?.display_phone_number || 'No account selected'}
+            primaryTypographyProps={{ variant: 'caption', color: 'text.secondary' }}
+            secondaryTypographyProps={{ variant: 'caption', color: 'text.secondary' }}
+          />
+        </MenuItem>
+        <MenuItem onClick={() => { handleConnectFlow(); setMobileMenuAnchorEl(null); }}>
+          <ListItemIcon><SettingsRoundedIcon fontSize="small" /></ListItemIcon>
+          <ListItemText primary={isAccountConnected ? 'Reconnect account' : 'Connect account'} />
+        </MenuItem>
+        {isAccountConnected && whatsappAccount?.id ? (
+          <MenuItem onClick={() => { handleDisconnect(whatsappAccount.id); setMobileMenuAnchorEl(null); }}>
+            <ListItemIcon><LogoutRoundedIcon fontSize="small" /></ListItemIcon>
+            <ListItemText primary="Disconnect account" />
+          </MenuItem>
+        ) : null}
         <Divider />
         <MenuItem onClick={() => { setActiveTab('settings'); setMobileMenuAnchorEl(null); }}>
           <ListItemIcon><SettingsRoundedIcon fontSize="small" /></ListItemIcon>

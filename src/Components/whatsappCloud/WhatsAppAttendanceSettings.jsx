@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Alert, Box, Button, Paper, Stack, Switch, TextField, Typography, FormControlLabel } from '@mui/material';
+import PropTypes from 'prop-types';
 import apiClient from '../../apiClient';
 import { parseApiError } from '../../utils/parseApiError';
 
@@ -11,7 +12,15 @@ const defaultConfig = {
   timezone: 'UTC',
 };
 
-export default function WhatsAppAttendanceSettings() {
+export default function WhatsAppAttendanceSettings({
+  whatsappAccount,
+  isAccountConnected,
+  isAccountLoading,
+  onConnect,
+  onDisconnect,
+  onRefreshAccount,
+  accountActionLoading,
+}) {
   const [form, setForm] = useState(defaultConfig);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -56,6 +65,33 @@ export default function WhatsAppAttendanceSettings() {
           <Typography variant="body2" color="text.secondary">Optional settings and analytics toggles. Hidden backend features fail gracefully.</Typography>
         </Box>
 
+        <Alert severity={isAccountConnected ? 'success' : 'info'}>
+          <Stack spacing={0.5}>
+            <Typography variant="body2" fontWeight={600}>
+              {isAccountConnected ? 'WhatsApp account connected' : 'No WhatsApp account connected'}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              {isAccountConnected
+                ? `${whatsappAccount?.verified_name || whatsappAccount?.display_name || 'Business account'} • ${whatsappAccount?.phone_number || whatsappAccount?.display_phone_number || 'Number unavailable'}`
+                : 'Connect your WhatsApp account to enable chats, templates, and broadcast.'}
+            </Typography>
+          </Stack>
+        </Alert>
+
+        <Stack direction="row" spacing={1.5} flexWrap="wrap">
+          <Button variant="outlined" onClick={onRefreshAccount} disabled={isAccountLoading || accountActionLoading}>
+            {isAccountLoading ? 'Checking...' : 'Refresh account'}
+          </Button>
+          <Button variant="contained" onClick={onConnect} disabled={accountActionLoading}>
+            {isAccountConnected ? 'Reconnect account' : 'Connect account'}
+          </Button>
+          {isAccountConnected && whatsappAccount?.id ? (
+            <Button color="error" variant="text" onClick={() => onDisconnect(whatsappAccount.id)} disabled={accountActionLoading}>
+              Disconnect
+            </Button>
+          ) : null}
+        </Stack>
+
         {message ? <Alert severity="success">{message}</Alert> : null}
         {error ? <Alert severity="warning">{error}</Alert> : null}
 
@@ -78,3 +114,29 @@ export default function WhatsAppAttendanceSettings() {
     </Paper>
   );
 }
+
+WhatsAppAttendanceSettings.propTypes = {
+  whatsappAccount: PropTypes.shape({
+    id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    verified_name: PropTypes.string,
+    display_name: PropTypes.string,
+    phone_number: PropTypes.string,
+    display_phone_number: PropTypes.string,
+  }),
+  isAccountConnected: PropTypes.bool,
+  isAccountLoading: PropTypes.bool,
+  onConnect: PropTypes.func,
+  onDisconnect: PropTypes.func,
+  onRefreshAccount: PropTypes.func,
+  accountActionLoading: PropTypes.bool,
+};
+
+WhatsAppAttendanceSettings.defaultProps = {
+  whatsappAccount: null,
+  isAccountConnected: false,
+  isAccountLoading: false,
+  onConnect: () => {},
+  onDisconnect: () => {},
+  onRefreshAccount: () => {},
+  accountActionLoading: false,
+};
