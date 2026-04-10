@@ -96,6 +96,15 @@ const getAccountPayload = (response) => {
   return data;
 };
 
+const getConnectConfigPayload = (response) => {
+  const data = response?.data?.data || response?.data || {};
+  return {
+    configId: data?.configId || data?.config_id || data?.configurationId || '',
+    appId: data?.appId || data?.app_id || '',
+    raw: data,
+  };
+};
+
 const SectionSurface = ({ children }) => (
   <Paper
     variant="outlined"
@@ -202,14 +211,20 @@ export default function WhatsAppCloudDashboard() {
     };
   }, [statusTick]);
 
-  const isAccountConnected = connectionState === 'connected' && Boolean(whatsappAccount);
+  const normalizedAccountStatus = String(
+    whatsappAccount?.status || whatsappAccountStatus || ''
+  ).toLowerCase();
+  const isAccountConnected =
+    Boolean(whatsappAccount) &&
+    !['disconnected', 'inactive', 'error', 'not_connected'].includes(normalizedAccountStatus) &&
+    connectionState !== 'error';
   const accountConnectionMode = whatsappAccount?.connection_mode || whatsappAccount?.connectionMode || null;
 
   const handleConnectFlow = useCallback(async () => {
     setIsAccountActionLoading(true);
     try {
       const configResponse = await fetchWhatsAppConnectConfig();
-      const config = configResponse?.data?.data || configResponse?.data || {};
+      const config = getConnectConfigPayload(configResponse);
       let payload = {};
 
       if (typeof window !== 'undefined' && typeof window.FB?.login === 'function' && config?.configId) {
@@ -226,11 +241,20 @@ export default function WhatsAppCloudDashboard() {
 
         const authCode = loginResponse?.authResponse?.code;
         if (!authCode) throw new Error('Meta Embedded Signup did not return an authorization code.');
-        payload = { code: authCode, flow: 'embedded_signup' };
+        payload = {
+          code: authCode,
+          flow: 'embedded_signup',
+          connectConfig: config.raw,
+          embeddedSignupResult: loginResponse,
+        };
       } else if (typeof window !== 'undefined') {
         const signupToken = window.prompt('Paste signup token/code from Meta Embedded Signup');
         if (!signupToken) return;
-        payload = { signupToken, flow: 'embedded_signup' };
+        payload = {
+          signupToken,
+          flow: 'embedded_signup',
+          connectConfig: config.raw,
+        };
       }
       await completeWhatsAppConnect(payload);
       await loadAccount();
@@ -296,6 +320,7 @@ export default function WhatsAppCloudDashboard() {
         accessToken: manualForm.accessToken,
         phoneNumberId: manualForm.phoneNumberId,
         businessAccountId: manualForm.businessAccountId,
+        wabaId: manualForm.businessAccountId,
         displayPhoneNumber: manualForm.displayPhoneNumber || undefined,
         verifiedName: manualForm.verifiedName || undefined,
       });
