@@ -20,7 +20,7 @@ const splitNumbers = (rawValue) =>
     .map((item) => item.replace(/[^\d+]/g, '').trim())
     .filter(Boolean);
 
-export default function BulkSender({ standalone }) {
+export default function BulkSender({ standalone, search }) {
   const [numbersText, setNumbersText] = useState('');
   const [template, setTemplate] = useState(null);
   const [isSending, setIsSending] = useState(false);
@@ -93,7 +93,7 @@ export default function BulkSender({ standalone }) {
           <input type="file" accept=".csv,text/csv" hidden onChange={handleCsvUpload} />
         </Button>
 
-        <TemplateSelector selectedTemplate={template} onTemplateChange={setTemplate} disabled={isSending} />
+        <TemplateSelector selectedTemplate={template} onTemplateChange={setTemplate} disabled={isSending} searchQuery={search} />
 
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25} alignItems={{ sm: 'center' }}>
           <Button variant="contained" onClick={sendBulkMessages} disabled={isSending || numbers.length === 0}>
@@ -115,5 +115,11 @@ export default function BulkSender({ standalone }) {
   );
 }
 
-BulkSender.propTypes = { standalone: PropTypes.bool };
-BulkSender.defaultProps = { standalone: false };
+BulkSender.propTypes = {
+  standalone: PropTypes.bool,
+  search: PropTypes.string,
+};
+BulkSender.defaultProps = {
+  standalone: false,
+  search: '',
+};
