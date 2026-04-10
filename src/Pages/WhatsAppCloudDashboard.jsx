@@ -286,13 +286,13 @@ export default function WhatsAppCloudDashboard() {
     setIsAccountActionLoading(true);
     try {
       await connectWhatsAppManual({
-        accessToken: manualForm.accessToken,
-        phoneNumberId: manualForm.phoneNumberId,
-        businessAccountId: manualForm.businessAccountId || undefined,
-        wabaId: manualForm.wabaId || manualForm.businessAccountId || undefined,
-        displayPhoneNumber: manualForm.displayPhoneNumber || undefined,
-        verifiedName: manualForm.verifiedName || undefined,
-      });
+  accessToken: manualForm.accessToken?.trim(),
+  phoneNumberId: manualForm.phoneNumberId?.trim(),
+  businessAccountId: manualForm.businessAccountId?.trim() || undefined,
+  wabaId: manualForm.wabaId?.trim() || undefined,
+  displayPhoneNumber: manualForm.displayPhoneNumber?.trim() || undefined,
+  verifiedName: manualForm.verifiedName?.trim() || undefined,
+});
       setManualDialogOpen(false);
       resetManualForm();
       await refreshWhatsAppAccount();
