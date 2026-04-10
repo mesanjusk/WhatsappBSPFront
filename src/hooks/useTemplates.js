@@ -20,10 +20,23 @@ const normalizeTemplates = (response) => {
   return (list || [])
     .filter(Boolean)
     .map((template) => {
-      const Components = Array.isArray(template?.Components) ? template.Components : [];
-      const bodyComponent = Components.find((component) =>
-        String(component?.type || '').toUpperCase() === 'BODY'
+      const components = Array.isArray(template?.components)
+        ? template.components
+        : Array.isArray(template?.Components)
+        ? template.Components
+        : [];
+
+      const bodyComponent = components.find(
+        (component) => String(component?.type || '').toUpperCase() === 'BODY'
       );
+
+      const exampleBody =
+        Array.isArray(bodyComponent?.example?.body_text) &&
+        Array.isArray(bodyComponent?.example?.body_text?.[0])
+          ? bodyComponent.example.body_text[0].join(' ')
+          : Array.isArray(bodyComponent?.example?.body_text)
+          ? bodyComponent.example.body_text.join(' ')
+          : '';
 
       return {
         ...template,
@@ -38,6 +51,7 @@ const normalizeTemplates = (response) => {
           template?.body ||
           template?.content ||
           bodyComponent?.text ||
+          exampleBody ||
           'Template preview unavailable.',
       };
     });
