@@ -1,71 +1,43 @@
 import { alpha, createTheme } from '@mui/material/styles';
 
-const SKY = '#38bdf8';
-const SKY_DARK = '#0284c7';
-const DEEP = '#0f172a';
-const SLATE = '#475569';
+const WHATSAPP_GREEN = '#25d366';
+const WHATSAPP_DARK = '#111b21';
+const WHATSAPP_PANEL = '#202c33';
+const BG = '#e9edef';
 const PAPER = '#ffffff';
-const BG = '#eef6fb';
-const BORDER = '#d7e6ef';
+const BORDER = '#d1d7db';
 
 export const lightTheme = createTheme({
   palette: {
     mode: 'light',
     primary: {
-      main: SKY,
-      dark: SKY_DARK,
-      light: '#7dd3fc',
-      contrastText: '#ffffff',
+      main: WHATSAPP_GREEN,
+      dark: '#128c7e',
+      contrastText: '#05260f',
     },
     secondary: {
-      main: DEEP,
-      dark: '#020617',
-      light: '#334155',
-      contrastText: '#ffffff',
-    },
-    success: {
-      main: '#22c55e',
-    },
-    warning: {
-      main: '#f59e0b',
-    },
-    error: {
-      main: '#ef4444',
+      main: WHATSAPP_DARK,
+      dark: '#0b141a',
+      contrastText: '#fff',
     },
     background: {
       default: BG,
       paper: PAPER,
     },
     text: {
-      primary: DEEP,
-      secondary: SLATE,
+      primary: '#111b21',
+      secondary: '#667781',
     },
     divider: BORDER,
   },
   shape: {
-    borderRadius: 12,
+    borderRadius: 14,
   },
   typography: {
     fontFamily: "Inter, Roboto, 'Segoe UI', Arial, sans-serif",
     fontSize: 13,
-    h5: {
-      fontSize: '1.05rem',
-      fontWeight: 700,
-    },
-    subtitle1: {
-      fontSize: '0.95rem',
-      fontWeight: 700,
-    },
-    subtitle2: {
-      fontSize: '0.88rem',
-      fontWeight: 700,
-    },
-    body2: {
-      fontSize: '0.82rem',
-    },
-    caption: {
-      fontSize: '0.74rem',
-    },
+    h6: { fontWeight: 700 },
+    subtitle1: { fontWeight: 700 },
   },
   Components: {
     MuiCssBaseline: {
@@ -73,24 +45,6 @@ export const lightTheme = createTheme({
         html: { height: '100%' },
         body: { height: '100%' },
         '#root': { height: '100%' },
-      },
-    },
-    MuiAppBar: {
-      styleOverrides: {
-        root: {
-          backgroundColor: alpha('#ffffff', 0.92),
-          backdropFilter: 'blur(10px)',
-          borderBottom: `1px solid ${BORDER}`,
-        },
-      },
-    },
-    MuiCard: {
-      styleOverrides: {
-        root: {
-          border: `1px solid ${BORDER}`,
-          boxShadow: '0 10px 24px rgba(15, 23, 42, 0.06)',
-          backgroundImage: 'none',
-        },
       },
     },
     MuiPaper: {
@@ -108,7 +62,7 @@ export const lightTheme = createTheme({
         root: {
           borderRadius: 10,
           textTransform: 'none',
-          fontWeight: 700,
+          fontWeight: 600,
         },
       },
     },
@@ -125,6 +79,32 @@ export const lightTheme = createTheme({
         root: {
           borderRadius: 12,
           backgroundColor: '#fff',
+        },
+      },
+    },
+    MuiListItemButton: {
+      styleOverrides: {
+        root: {
+          borderRadius: 10,
+          '&.Mui-selected': {
+            backgroundColor: alpha(WHATSAPP_GREEN, 0.12),
+          },
+        },
+      },
+    },
+    MuiBottomNavigation: {
+      styleOverrides: {
+        root: {
+          borderTop: `1px solid ${BORDER}`,
+        },
+      },
+    },
+    MuiBottomNavigationAction: {
+      styleOverrides: {
+        root: {
+          '&.Mui-selected': {
+            color: WHATSAPP_PANEL,
+          },
         },
       },
     },

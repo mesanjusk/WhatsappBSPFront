@@ -5,7 +5,7 @@ import { Avatar, Box, IconButton, Stack, Typography } from '@mui/material';
 
 export default function ChatHeader({ conversation, onRefresh, onBack, windowOpen }) {
   return (
-    <Box sx={{ px: 1.2, py: 0.9, bgcolor: '#f0f2f5', borderBottom: '1px solid #d1d7db' }}>
+    <Box sx={{ px: 1.2, py: 0.9, bgcolor: '#f0f2f5', borderBottom: '1px solid #d1d7db', position: 'sticky', top: 0, zIndex: 2 }}>
       <Stack direction="row" alignItems="center" spacing={1}>
         <IconButton size="small" sx={{ display: { xs: 'inline-flex', lg: 'none' } }} onClick={onBack}>
           <ArrowBackRoundedIcon fontSize="small" />
