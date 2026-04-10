@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import OrderUpdate from "./OrderUpdate";
 import UpdateDelivery from "./updateDelivery";
-import OrderBoard from "../components/orders/OrderBoard";
+import OrderBoard from "../Components/orders/OrderBoard";
 import {
   LABELS,
   ROLE_TYPES,

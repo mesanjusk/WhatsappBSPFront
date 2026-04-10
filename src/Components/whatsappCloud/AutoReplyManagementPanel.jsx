@@ -40,8 +40,8 @@ export default function AutoReplyManagementPanel() {
 
         // keep only static templates (no body variables)
         const safeTemplates = list.filter((tpl) => {
-          const components = Array.isArray(tpl?.components) ? tpl.components : [];
-          const body = components.find(
+          const Components = Array.isArray(tpl?.Components) ? tpl.Components : [];
+          const body = Components.find(
             (component) => String(component?.type || '').toUpperCase() === 'BODY'
           );
           return !String(body?.text || '').includes('{{');

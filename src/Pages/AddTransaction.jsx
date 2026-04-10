@@ -21,8 +21,8 @@ import {
   buildAmountReceivedParameters,
 } from '../constants/whatsappTemplates';
 import { sendAdminAlertText } from '../utils/whatsapp';
-import { FullscreenAddFormLayout } from '../components/ui';
-import { compactCardSx, compactFieldSx } from '../components/ui/addFormStyles';
+import { FullscreenAddFormLayout } from '../Components/ui';
+import { compactCardSx, compactFieldSx } from '../Components/ui/addFormStyles';
 
 export default function AddTransaction({ editMode, existingData, onClose, onSuccess }) {
   const navigate = useNavigate();
@@ -181,7 +181,7 @@ export default function AddTransaction({ editMode, existingData, onClose, onSucc
         to: cleanPhone,
         template_name: WHATSAPP_TEMPLATES.AMOUNT_RECEIVED,
         language: DEFAULT_TEMPLATE_LANGUAGE,
-        components: [{
+        Components: [{
           type: 'body',
           parameters: buildAmountReceivedParameters({
             customerName: Customer_name || 'Customer',

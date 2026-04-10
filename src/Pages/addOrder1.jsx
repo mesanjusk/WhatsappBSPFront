@@ -31,8 +31,8 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import SendRoundedIcon from '@mui/icons-material/SendRounded';
-import { FullscreenAddFormLayout } from '../components/ui';
-import { compactCardSx, compactFieldSx } from '../components/ui/addFormStyles';
+import { FullscreenAddFormLayout } from '../Components/ui';
+import { compactCardSx, compactFieldSx } from '../Components/ui/addFormStyles';
 
 const createEmptyItem = () => ({
   Item: '',
@@ -431,7 +431,7 @@ export default function AddOrder1({ closeModal }) {
         to: cleanPhone,
         template_name: WHATSAPP_TEMPLATES.ORDER_CONFIRMATION,
         language: DEFAULT_TEMPLATE_LANGUAGE,
-        components: [
+        Components: [
           {
             type: 'body',
             parameters: buildOrderConfirmationParameters({
