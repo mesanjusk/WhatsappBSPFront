@@ -2,6 +2,8 @@ import {
   Box,
   Button,
   Chip,
+  FormControlLabel,
+  MenuItem,
   Paper,
   Stack,
   Switch,
@@ -117,15 +119,50 @@ export default function AutoReplyManagementPanel() {
 
       {isModalOpen ? (
         <Modal onClose={() => setIsModalOpen(false)} title={editingRule ? 'Edit Rule' : 'Add Rule'}>
-          <form onSubmit={handleSaveRule} className="space-y-4">
-            <label className="block text-sm text-gray-700">Keyword<input value={formData.keyword} onChange={(event) => setFormData((prev) => ({ ...prev, keyword: event.target.value }))} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2" /></label>
-            <label className="block text-sm text-gray-700">Match Type<select value={formData.matchType} onChange={(event) => setFormData((prev) => ({ ...prev, matchType: event.target.value }))} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"><option value="contains">Contains</option><option value="exact">Exact</option><option value="starts_with">Starts with</option></select></label>
-            <label className="block text-sm text-gray-700">Reply Mode<select value={formData.replyMode} onChange={(event) => setFormData((prev) => ({ ...prev, replyMode: event.target.value, templateName: event.target.value === 'template' ? prev.templateName : '', replyText: event.target.value === 'text' ? prev.replyText : '' }))} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"><option value="text">Reply Text</option><option value="template">Reply Template</option></select></label>
-            {formData.replyMode === 'text' ? <label className="block text-sm text-gray-700">Reply<textarea rows={3} value={formData.replyText} onChange={(event) => setFormData((prev) => ({ ...prev, replyText: event.target.value }))} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2" /></label> : <div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><label className="block text-sm text-gray-700">Template Name<input value={formData.templateName} onChange={(event) => setFormData((prev) => ({ ...prev, templateName: event.target.value }))} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2" /></label><label className="block text-sm text-gray-700">Language<input value={formData.templateLanguage} onChange={(event) => setFormData((prev) => ({ ...prev, templateLanguage: event.target.value }))} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2" /></label></div>}
-            <label className="block text-sm text-gray-700">Delay Seconds<input type="number" min="0" max="30" value={formData.delaySeconds} onChange={(event) => setFormData((prev) => ({ ...prev, delaySeconds: event.target.value }))} className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2" /></label>
-            <label className="inline-flex items-center gap-2 text-sm text-gray-700"><Switch checked={formData.active} onChange={(event) => setFormData((prev) => ({ ...prev, active: event.target.checked }))} />Active</label>
-            <div className="flex justify-end gap-2"><button type="button" onClick={() => setIsModalOpen(false)} className="rounded-lg border border-gray-300 px-4 py-2 text-sm">Cancel</button><button type="submit" disabled={isSavingRule} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60">{isSavingRule ? 'Saving...' : 'Save'}</button></div>
-          </form>
+          <Stack component="form" onSubmit={handleSaveRule} spacing={1.5}>
+            <TextField label="Keyword" value={formData.keyword} onChange={(event) => setFormData((prev) => ({ ...prev, keyword: event.target.value }))} />
+            <TextField select label="Match Type" value={formData.matchType} onChange={(event) => setFormData((prev) => ({ ...prev, matchType: event.target.value }))}>
+              <MenuItem value="contains">Contains</MenuItem>
+              <MenuItem value="exact">Exact</MenuItem>
+              <MenuItem value="starts_with">Starts with</MenuItem>
+            </TextField>
+            <TextField
+              select
+              label="Reply Mode"
+              value={formData.replyMode}
+              onChange={(event) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  replyMode: event.target.value,
+                  templateName: event.target.value === 'template' ? prev.templateName : '',
+                  replyText: event.target.value === 'text' ? prev.replyText : '',
+                }))
+              }
+            >
+              <MenuItem value="text">Reply Text</MenuItem>
+              <MenuItem value="template">Reply Template</MenuItem>
+            </TextField>
+            {formData.replyMode === 'text' ? (
+              <TextField multiline rows={3} label="Reply" value={formData.replyText} onChange={(event) => setFormData((prev) => ({ ...prev, replyText: event.target.value }))} />
+            ) : (
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+                <TextField label="Template Name" value={formData.templateName} onChange={(event) => setFormData((prev) => ({ ...prev, templateName: event.target.value }))} fullWidth />
+                <TextField label="Language" value={formData.templateLanguage} onChange={(event) => setFormData((prev) => ({ ...prev, templateLanguage: event.target.value }))} fullWidth />
+              </Stack>
+            )}
+            <TextField
+              type="number"
+              label="Delay Seconds"
+              inputProps={{ min: 0, max: 30 }}
+              value={formData.delaySeconds}
+              onChange={(event) => setFormData((prev) => ({ ...prev, delaySeconds: event.target.value }))}
+            />
+            <FormControlLabel control={<Switch checked={formData.active} onChange={(event) => setFormData((prev) => ({ ...prev, active: event.target.checked }))} />} label="Active" />
+            <Stack direction="row" justifyContent="flex-end" spacing={1}>
+              <Button type="button" onClick={() => setIsModalOpen(false)} variant="outlined">Cancel</Button>
+              <Button type="submit" disabled={isSavingRule} variant="contained">{isSavingRule ? 'Saving...' : 'Save'}</Button>
+            </Stack>
+          </Stack>
         </Modal>
       ) : null}
     </Paper>

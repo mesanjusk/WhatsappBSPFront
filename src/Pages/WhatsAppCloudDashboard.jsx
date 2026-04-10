@@ -14,6 +14,8 @@ import {
   ListItemIcon,
   Paper,
   Stack,
+  Tab,
+  Tabs,
   TextField,
   Tooltip,
   Typography,
@@ -50,6 +52,8 @@ const navItems = [
   { key: 'settings', label: 'Settings', icon: <SettingsRoundedIcon /> },
 ];
 
+const mobileTabs = navItems.filter((item) => item.key !== 'analytics');
+
 const getFriendlyStatusError = (error) => {
   const statusCode = error?.response?.status;
   if (statusCode === 401 || statusCode === 403) return 'Token expired. Please sign in again.';
@@ -68,6 +72,7 @@ const SectionSurface = ({ children }) => (
       overflow: 'hidden',
       borderColor: 'rgba(17, 27, 33, 0.12)',
       boxShadow: { lg: '0 24px 55px rgba(17, 27, 33, 0.14)' },
+      bgcolor: '#f7f8fa',
     }}
   >
     {children}
@@ -123,7 +128,7 @@ export default function WhatsAppCloudDashboard() {
     };
   }, [statusTick]);
 
-  const renderSection = useMemo(() => {
+  const sectionNode = useMemo(() => {
     if (activeTab === 'inbox') return <MessagesPanel search={search} />;
     if (activeTab === 'templates') return <SendMessagePanel />;
     if (activeTab === 'campaigns') return <BulkSender standalone />;
@@ -134,6 +139,8 @@ export default function WhatsAppCloudDashboard() {
 
   const connectionChipColor =
     connectionState === 'connected' ? 'success' : connectionState === 'loading' ? 'warning' : 'error';
+
+  const mobileTabValue = activeTab === 'analytics' ? 'settings' : activeTab;
 
   return (
     <Box
@@ -228,10 +235,26 @@ export default function WhatsAppCloudDashboard() {
               </Stack>
             </Stack>
 
+            {isMobile && mobileTabValue === 'settings' ? (
+              <Tabs
+                value={activeTab === 'analytics' ? 'analytics' : 'settings'}
+                onChange={(_, value) => setActiveTab(value)}
+                sx={{
+                  minHeight: 30,
+                  '& .MuiTab-root': { minHeight: 30, color: 'rgba(255,255,255,0.85)', textTransform: 'none' },
+                  '& .MuiTab-root.Mui-selected': { color: '#fff', fontWeight: 700 },
+                  '& .MuiTabs-indicator': { backgroundColor: '#fff' },
+                }}
+              >
+                <Tab value="settings" label="Settings" />
+                <Tab value="analytics" label="Analytics" />
+              </Tabs>
+            ) : null}
+
             <TextField
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder={activeTab === 'inbox' ? 'Search chats' : 'Search'}
+              placeholder={activeTab === 'inbox' ? 'Search chats' : 'Search in section'}
               size="small"
               sx={{
                 maxWidth: { lg: 430 },
@@ -260,7 +283,7 @@ export default function WhatsAppCloudDashboard() {
 
         <Box sx={{ flex: 1, minHeight: 0, p: { xs: 0, lg: 1.5 } }}>
           <SectionSurface>
-            <Suspense fallback={<LoadingSkeleton lines={isDesktop ? 9 : 7} />}>{renderSection}</Suspense>
+            <Suspense fallback={<LoadingSkeleton lines={isDesktop ? 9 : 7} />}>{sectionNode}</Suspense>
           </SectionSurface>
         </Box>
       </Stack>
@@ -269,7 +292,7 @@ export default function WhatsAppCloudDashboard() {
         <Paper sx={{ position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 1300, borderRadius: 0 }} elevation={6}>
           <BottomNavigation
             showLabels
-            value={activeTab}
+            value={mobileTabValue}
             onChange={(_, value) => setActiveTab(value)}
             sx={{
               height: 66,
@@ -277,7 +300,7 @@ export default function WhatsAppCloudDashboard() {
               '& .MuiBottomNavigationAction-label': { fontSize: '0.68rem' },
             }}
           >
-            {navItems.map((item) => (
+            {mobileTabs.map((item) => (
               <BottomNavigationAction
                 key={item.key}
                 value={item.key}
