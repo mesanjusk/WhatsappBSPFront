@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { toast } from '../../../Components';
+import { toast } from '../../../Components/Toast';
 import { whatsappCloudService } from '../../../services/whatsappCloudService';
 import { parseApiError } from '../../../utils/parseApiError';
 

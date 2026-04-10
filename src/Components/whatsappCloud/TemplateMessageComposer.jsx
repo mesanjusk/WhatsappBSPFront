@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import SendRoundedIcon from '@mui/icons-material/SendRounded';
 import { Button, Stack } from '@mui/material';
-import { toast } from '../../Components';
+import { toast } from '../../Components/Toast';
 import { buildTemplatePayload, whatsappCloudService } from '../../services/whatsappCloudService';
 import { parseApiError } from '../../utils/parseApiError';
 import TemplateSelector from './TemplateSelector';

@@ -1,54 +1,57 @@
-import { createContext, useCallback, useContext, useMemo, useState } from "react";
-import { ROLE_TYPES, isAdminRole, isOfficeRole, normalizeRole } from "../constants/roles";
+import { createContext, useCallback, useContext, useMemo, useState } from 'react';
 import {
   STORAGE_KEYS,
   clearStoredSession,
+  getStoredToken,
   persistAuthState,
   pickFirst,
-} from "../utils/authStorage";
-
-const initialAuthState = () => ({
-  userName: pickFirst([STORAGE_KEYS.userName]),
-  userGroup: pickFirst([
-    STORAGE_KEYS.userGroup,
-    STORAGE_KEYS.role,
-    STORAGE_KEYS.roleFallback,
-    STORAGE_KEYS.userRoleLegacy,
-  ]),
-  mobileNumber: pickFirst([STORAGE_KEYS.mobileNumber]),
-});
+  setStoredToken,
+} from '../utils/authStorage';
 
 const AuthContext = createContext(null);
 
+const getInitialUser = () => ({
+  userName: pickFirst([STORAGE_KEYS.userName]),
+  userGroup: pickFirst([STORAGE_KEYS.userGroup]),
+  mobileNumber: pickFirst([STORAGE_KEYS.mobileNumber]),
+});
+
 export function AuthProvider({ children }) {
-  const [authState, setAuthState] = useState(initialAuthState);
+  const [token, setToken] = useState(() => getStoredToken());
+  const [user, setUser] = useState(getInitialUser);
 
-  const setAuthData = useCallback((updates) => {
-    setAuthState((prev) => {
-      const next = { ...prev, ...updates };
-      persistAuthState(next);
-      return next;
-    });
+  const login = useCallback((nextToken, userData = {}) => {
+    setStoredToken(nextToken || '');
+    setToken(nextToken || '');
+
+    const nextUser = {
+      userName: userData.userName || '',
+      userGroup: userData.userGroup || '',
+      mobileNumber: userData.mobileNumber || '',
+    };
+
+    persistAuthState(nextUser);
+    setUser(nextUser);
   }, []);
 
-  const clearAuth = useCallback(() => {
-    setAuthState({ userName: "", userGroup: "", mobileNumber: "" });
+  const logout = useCallback(() => {
     clearStoredSession();
+    setToken('');
+    setUser({ userName: '', userGroup: '', mobileNumber: '' });
   }, []);
-
-  const normalizedRole = useMemo(() => normalizeRole(authState.userGroup), [authState.userGroup]);
 
   const value = useMemo(
     () => ({
-      ...authState,
-      normalizedRole,
-      role: authState.userGroup || ROLE_TYPES.OFFICE,
-      isAdmin: isAdminRole(authState.userGroup),
-      isOfficeUser: isOfficeRole(authState.userGroup) || !authState.userGroup,
-      setAuthData,
-      clearAuth,
+      token,
+      user,
+      userName: user.userName,
+      userGroup: user.userGroup,
+      mobileNumber: user.mobileNumber,
+      isAuthenticated: Boolean(token),
+      login,
+      logout,
     }),
-    [authState, normalizedRole, setAuthData, clearAuth],
+    [login, logout, token, user],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -56,6 +59,6 @@ export function AuthProvider({ children }) {
 
 export function useAuth() {
   const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error("useAuth must be used within an AuthProvider");
+  if (!ctx) throw new Error('useAuth must be used within an AuthProvider');
   return ctx;
 }
