@@ -1,4 +1,5 @@
-import { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { fetchWhatsAppAccount } from '../services/whatsappCloudService';
 import {
   STORAGE_KEYS,
   clearStoredSession,
@@ -16,9 +17,20 @@ const getInitialUser = () => ({
   mobileNumber: pickFirst([STORAGE_KEYS.mobileNumber]),
 });
 
+const getAccountPayload = (response) => {
+  const data = response?.data?.data ?? response?.data ?? null;
+  if (Array.isArray(data)) return data[0] || null;
+  if (Array.isArray(data?.items)) return data.items[0] || null;
+  if (data?.account) return data.account;
+  return data;
+};
+
 export function AuthProvider({ children }) {
   const [token, setToken] = useState(() => getStoredToken());
   const [user, setUser] = useState(getInitialUser);
+  const [whatsappAccount, setWhatsappAccount] = useState(null);
+  const [whatsappAccountStatus, setWhatsappAccountStatus] = useState('idle');
+  const [isAccountLoading, setIsAccountLoading] = useState(false);
 
   const login = useCallback((nextToken, userData = {}) => {
     setStoredToken(nextToken || '');
@@ -34,11 +46,54 @@ export function AuthProvider({ children }) {
     setUser(nextUser);
   }, []);
 
+  const refreshWhatsAppAccount = useCallback(async () => {
+    if (!getStoredToken()) {
+      setWhatsappAccount(null);
+      setWhatsappAccountStatus('not_connected');
+      setIsAccountLoading(false);
+      return null;
+    }
+
+    setIsAccountLoading(true);
+    try {
+      const response = await fetchWhatsAppAccount();
+      const account = getAccountPayload(response);
+      setWhatsappAccount(account);
+      setWhatsappAccountStatus(account?.status || (account ? 'connected' : 'not_connected'));
+      return account;
+    } catch (error) {
+      const statusCode = error?.response?.status;
+      if (statusCode === 404 || statusCode === 204) {
+        setWhatsappAccount(null);
+        setWhatsappAccountStatus('not_connected');
+        return null;
+      }
+      setWhatsappAccount(null);
+      setWhatsappAccountStatus('error');
+      return null;
+    } finally {
+      setIsAccountLoading(false);
+    }
+  }, []);
+
   const logout = useCallback(() => {
     clearStoredSession();
     setToken('');
     setUser({ userName: '', userGroup: '', mobileNumber: '' });
+    setWhatsappAccount(null);
+    setWhatsappAccountStatus('idle');
+    setIsAccountLoading(false);
   }, []);
+
+  useEffect(() => {
+    if (token) {
+      refreshWhatsAppAccount();
+      return;
+    }
+    setWhatsappAccount(null);
+    setWhatsappAccountStatus('idle');
+    setIsAccountLoading(false);
+  }, [refreshWhatsAppAccount, token]);
 
   const value = useMemo(
     () => ({
@@ -48,10 +103,30 @@ export function AuthProvider({ children }) {
       userGroup: user.userGroup,
       mobileNumber: user.mobileNumber,
       isAuthenticated: Boolean(token),
+      whatsappAccount,
+      whatsappAccountStatus,
+      isAccountLoading,
+      isAccountConnected:
+        Boolean(whatsappAccount) &&
+        !['disconnected', 'inactive', 'error', 'not_connected'].includes(
+          String(whatsappAccount?.status || whatsappAccountStatus || '').toLowerCase(),
+        ),
+      accountConnectionMode:
+        whatsappAccount?.connection_mode || whatsappAccount?.connectionMode || null,
+      refreshWhatsAppAccount,
       login,
       logout,
     }),
-    [login, logout, token, user],
+    [
+      isAccountLoading,
+      login,
+      logout,
+      refreshWhatsAppAccount,
+      token,
+      user,
+      whatsappAccount,
+      whatsappAccountStatus,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

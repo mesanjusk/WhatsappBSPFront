@@ -41,13 +41,10 @@ import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded';
 import MoreVertRoundedIcon from '@mui/icons-material/MoreVertRounded';
 import { toast } from '../Components/Toast';
 import {
-  activateWhatsAppAccount,
   connectWhatsAppManual,
   completeWhatsAppConnect,
-  fetchWhatsAppAccounts,
   fetchWhatsAppConnectConfig,
   disconnectWhatsAppAccount,
-  fetchWhatsAppAccount,
   fetchWhatsAppStatus,
   revalidateWhatsAppAccount,
 } from '../services/whatsappCloudService';
@@ -90,14 +87,6 @@ const getFriendlyStatusError = (error) => {
   return parseApiError(error, 'Unable to check WhatsApp status right now.');
 };
 
-const getAccountPayload = (response) => {
-  const data = response?.data?.data ?? response?.data ?? null;
-  if (Array.isArray(data)) return data[0] || null;
-  if (Array.isArray(data?.items)) return data.items[0] || null;
-  if (data?.account) return data.account;
-  return data;
-};
-
 const getConnectConfigPayload = (response) => {
   const data = response?.data?.data || response?.data || {};
   return {
@@ -134,9 +123,6 @@ export default function WhatsAppCloudDashboard() {
   const [statusError, setStatusError] = useState('');
   const [lastCheckedAt, setLastCheckedAt] = useState(null);
   const [statusTick, setStatusTick] = useState(0);
-  const [whatsappAccount, setWhatsappAccount] = useState(null);
-  const [whatsappAccountStatus, setWhatsappAccountStatus] = useState('loading');
-  const [isAccountLoading, setIsAccountLoading] = useState(true);
   const [isAccountActionLoading, setIsAccountActionLoading] = useState(false);
   const [mobileMenuAnchorEl, setMobileMenuAnchorEl] = useState(null);
   const [manualDialogOpen, setManualDialogOpen] = useState(false);
@@ -149,48 +135,18 @@ export default function WhatsAppCloudDashboard() {
     verifiedName: '',
   });
   const [manualFormError, setManualFormError] = useState('');
-  const { userName, userGroup, mobileNumber } = useAuth();
+  const {
+    userName,
+    userGroup,
+    mobileNumber,
+    whatsappAccount,
+    whatsappAccountStatus,
+    isAccountLoading,
+    isAccountConnected,
+    accountConnectionMode,
+    refreshWhatsAppAccount,
+  } = useAuth();
   const outletContext = useOutletContext() || {};
-
-  const loadAccount = useCallback(async () => {
-    setIsAccountLoading(true);
-    try {
-      const response = await fetchWhatsAppAccount();
-      const account = getAccountPayload(response);
-      if (!account) {
-        try {
-          const accountsResponse = await fetchWhatsAppAccounts();
-          const fallbackAccount = getAccountPayload(accountsResponse);
-          if (fallbackAccount?.id) {
-            await activateWhatsAppAccount(fallbackAccount.id);
-            setWhatsappAccount(fallbackAccount);
-            setWhatsappAccountStatus(fallbackAccount?.status || 'connected');
-            return;
-          }
-        } catch (activationError) {
-          console.error('Could not activate fallback WhatsApp account', activationError);
-        }
-      }
-      setWhatsappAccount(account);
-      setWhatsappAccountStatus(account?.status || (account ? 'connected' : 'not_connected'));
-    } catch (error) {
-      const statusCode = error?.response?.status;
-      if (statusCode === 404 || statusCode === 204) {
-        setWhatsappAccount(null);
-        setWhatsappAccountStatus('not_connected');
-        return;
-      }
-      setWhatsappAccount(null);
-      setWhatsappAccountStatus('error');
-      toast.error(parseApiError(error, 'Unable to load WhatsApp account.'));
-    } finally {
-      setIsAccountLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadAccount();
-  }, [loadAccount]);
 
   useEffect(() => {
     let active = true;
@@ -227,15 +183,6 @@ export default function WhatsAppCloudDashboard() {
       clearInterval(interval);
     };
   }, [statusTick]);
-
-  const normalizedAccountStatus = String(
-    whatsappAccount?.status || whatsappAccountStatus || ''
-  ).toLowerCase();
-  const isAccountConnected =
-    Boolean(whatsappAccount) &&
-    !['disconnected', 'inactive', 'error', 'not_connected'].includes(normalizedAccountStatus) &&
-    connectionState !== 'error';
-  const accountConnectionMode = whatsappAccount?.connection_mode || whatsappAccount?.connectionMode || null;
 
   const handleConnectFlow = useCallback(async () => {
     setIsAccountActionLoading(true);
@@ -274,7 +221,7 @@ export default function WhatsAppCloudDashboard() {
         };
       }
       await completeWhatsAppConnect(payload);
-      await loadAccount();
+      await refreshWhatsAppAccount();
       setStatusTick((prev) => prev + 1);
       toast.success('WhatsApp account connected.');
     } catch (error) {
@@ -282,14 +229,14 @@ export default function WhatsAppCloudDashboard() {
     } finally {
       setIsAccountActionLoading(false);
     }
-  }, [loadAccount]);
+  }, [refreshWhatsAppAccount]);
 
   const handleDisconnect = useCallback(async (accountId) => {
     if (!accountId) return;
     setIsAccountActionLoading(true);
     try {
       await disconnectWhatsAppAccount(accountId);
-      await loadAccount();
+      await refreshWhatsAppAccount();
       setStatusTick((prev) => prev + 1);
       toast.success('WhatsApp account disconnected.');
     } catch (error) {
@@ -297,14 +244,14 @@ export default function WhatsAppCloudDashboard() {
     } finally {
       setIsAccountActionLoading(false);
     }
-  }, [loadAccount]);
+  }, [refreshWhatsAppAccount]);
 
   const handleReconnect = useCallback(async () => {
     if (!whatsappAccount?.id) return;
     setIsAccountActionLoading(true);
     try {
       await revalidateWhatsAppAccount(whatsappAccount.id);
-      await loadAccount();
+      await refreshWhatsAppAccount();
       setStatusTick((prev) => prev + 1);
       toast.success('WhatsApp account revalidated.');
     } catch (error) {
@@ -312,7 +259,7 @@ export default function WhatsAppCloudDashboard() {
     } finally {
       setIsAccountActionLoading(false);
     }
-  }, [loadAccount, whatsappAccount?.id]);
+  }, [refreshWhatsAppAccount, whatsappAccount?.id]);
 
   const resetManualForm = useCallback(() => {
     setManualForm({
@@ -348,7 +295,7 @@ export default function WhatsAppCloudDashboard() {
       });
       setManualDialogOpen(false);
       resetManualForm();
-      await loadAccount();
+      await refreshWhatsAppAccount();
       setStatusTick((prev) => prev + 1);
       toast.success('WhatsApp account connected manually.');
     } catch (error) {
@@ -356,7 +303,7 @@ export default function WhatsAppCloudDashboard() {
     } finally {
       setIsAccountActionLoading(false);
     }
-  }, [loadAccount, manualForm, resetManualForm]);
+  }, [manualForm, refreshWhatsAppAccount, resetManualForm]);
 
   const sectionNode = useMemo(() => {
     if (!isAccountConnected && activeTab !== 'settings') {
@@ -375,7 +322,7 @@ export default function WhatsAppCloudDashboard() {
               <Button variant="text" onClick={() => setManualDialogOpen(true)} disabled={isAccountActionLoading}>
                 Connect manually
               </Button>
-              <Button variant="outlined" onClick={() => { loadAccount(); setStatusTick((prev) => prev + 1); }} disabled={isAccountLoading}>
+              <Button variant="outlined" onClick={() => { refreshWhatsAppAccount(); setStatusTick((prev) => prev + 1); }} disabled={isAccountLoading}>
                 Refresh status
               </Button>
           </Stack>
@@ -395,7 +342,7 @@ export default function WhatsAppCloudDashboard() {
         isAccountLoading={isAccountLoading}
         onConnect={handleConnectFlow}
         onDisconnect={handleDisconnect}
-        onRefreshAccount={loadAccount}
+        onRefreshAccount={refreshWhatsAppAccount}
         onManualConnect={() => setManualDialogOpen(true)}
         onReconnect={handleReconnect}
         whatsappAccountStatus={whatsappAccountStatus}
@@ -410,7 +357,7 @@ export default function WhatsAppCloudDashboard() {
     isAccountActionLoading,
     isAccountConnected,
     isAccountLoading,
-    loadAccount,
+    refreshWhatsAppAccount,
     handleReconnect,
     search,
     whatsappAccountStatus,
