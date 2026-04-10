@@ -143,8 +143,8 @@ export default function ConversationList({
           renderInput={(params) => (
             <TextField
               {...params}
-              placeholder="Select customer or mobile"
-              helperText={customerLoadError || 'Open chat directly from CRM customer list'}
+              placeholder="Enter number to start chat"
+              helperText={customerLoadError || 'Start chat directly with a phone number'}
               error={Boolean(customerLoadError)}
               sx={{
                 '& .MuiOutlinedInput-root': {

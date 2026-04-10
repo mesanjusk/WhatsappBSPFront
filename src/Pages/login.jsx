@@ -1,5 +1,7 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import LoginRoundedIcon from '@mui/icons-material/LoginRounded';
+import LockRoundedIcon from '@mui/icons-material/LockRounded';
+import PersonRoundedIcon from '@mui/icons-material/PersonRounded';
 import {
   Alert,
   Box,
@@ -12,101 +14,69 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import PersonRoundedIcon from '@mui/icons-material/PersonRounded';
-import LockRoundedIcon from '@mui/icons-material/LockRounded';
-import LoginRoundedIcon from '@mui/icons-material/LoginRounded';
-import axios from '../apiClient.js';
-import { MobileContainer, toast } from '../Components';
+import { useNavigate } from 'react-router-dom';
+import apiClient from '../apiClient';
+import MobileContainer from '../Components/MobileContainer';
+import { toast } from '../Components/Toast';
+import { ROUTES } from '../constants/routes';
 import { useAuth } from '../context/AuthContext';
-import { setStoredToken } from '../utils/authStorage';
-
-const BACKEND_BASE = import.meta.env.VITE_API_SERVER || 'https://misbackend-e078.onrender.com';
 
 export default function Login() {
   const navigate = useNavigate();
-  const [User_name, setUser_Name] = useState('');
-  const [Password, setPassword] = useState('');
+  const { login, isAuthenticated } = useAuth();
+  const [userName, setUserName] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorText, setErrorText] = useState('');
-  const { setAuthData, userName, userGroup } = useAuth();
 
   useEffect(() => {
-    if (!userName) return;
-
-    const target = userGroup === 'Vendor' ? '/vendorHome' : '/home';
-    navigate(target, { replace: true });
-  }, [navigate, userGroup, userName]);
-
-  async function checkGoogleDriveAndRedirect(userGroupValue) {
-    try {
-      const statusRes = await axios.get('/api/google-drive/status');
-      const connected = !!statusRes?.data?.connected;
-
-      if (!connected) {
-        const returnTo = userGroupValue === 'Vendor' ? `${window.location.origin}/vendorHome` : `${window.location.origin}/home`;
-
-        window.location.href = `${BACKEND_BASE}/api/google-drive/connect?returnTo=${encodeURIComponent(returnTo)}`;
-        return;
-      }
-
-      const target = userGroupValue === 'Vendor' ? '/vendorHome' : '/home';
-      navigate(target, { replace: true });
-    } catch (error) {
-      console.error('Google Drive status check failed:', error);
-      const target = userGroupValue === 'Vendor' ? '/vendorHome' : '/home';
-      navigate(target, { replace: true });
+    if (isAuthenticated) {
+      navigate(ROUTES.WHATSAPP, { replace: true });
     }
-  }
+  }, [isAuthenticated, navigate]);
 
-  async function submit(e) {
-    e.preventDefault();
+  const submit = async (event) => {
+    event.preventDefault();
     setLoading(true);
     setErrorText('');
 
     try {
-      const response = await axios.post('/user/login', {
-        User_name,
-        Password,
+      const response = await apiClient.post('/user/login', {
+        User_name: userName,
+        Password: password,
       });
 
-      const data = response.data;
+      const data = response?.data || {};
 
       if (data.status === 'notexist') {
         setErrorText('User has not signed up.');
-        setLoading(false);
         return;
       }
 
       if (data.status === 'invalid') {
         setErrorText('Invalid credentials. Please check username and password.');
-        setLoading(false);
         return;
       }
 
       if (!data.token) {
         setErrorText('Login succeeded but token was not received from the server.');
-        console.error('Token missing in response:', data);
-        setLoading(false);
         return;
       }
 
-      setStoredToken(data.token);
-
-      setAuthData({
-        userName: User_name,
-        userGroup: data.userGroup,
+      login(data.token, {
+        userName,
+        userGroup: data.userGroup || '',
         mobileNumber: data.userMobile || data.userMob || '',
       });
 
-      toast.success('Login successful. Redirecting...');
-      await checkGoogleDriveAndRedirect(data.userGroup);
-    } catch (error) {
-      console.error('Login error:', error);
-      setErrorText('An error occurred during login. Please try again.');
+      toast.success('Login successful.');
+      navigate(ROUTES.WHATSAPP, { replace: true });
+    } catch {
+      setErrorText('Login failed. Please try again.');
     } finally {
       setLoading(false);
     }
-  }
+  };
 
   return (
     <Box sx={{ minHeight: '100vh', display: 'grid', placeItems: 'center', px: 2 }}>
@@ -118,7 +88,7 @@ export default function Login() {
                 <Typography variant="h5" fontWeight={700} gutterBottom>
                   Welcome back
                 </Typography>
-                <Typography color="text.secondary">Sign in to access your MIS dashboard.</Typography>
+                <Typography color="text.secondary">Sign in to access your WhatsApp dashboard.</Typography>
               </Box>
 
               {errorText && <Alert severity="error">{errorText}</Alert>}
@@ -126,8 +96,8 @@ export default function Login() {
               <TextField
                 label="User Name"
                 autoComplete="username"
-                value={User_name}
-                onChange={(e) => setUser_Name(e.target.value)}
+                value={userName}
+                onChange={(e) => setUserName(e.target.value)}
                 required
                 InputProps={{
                   startAdornment: (
@@ -142,7 +112,7 @@ export default function Login() {
                 label="Password"
                 type="password"
                 autoComplete="current-password"
-                value={Password}
+                value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 InputProps={{

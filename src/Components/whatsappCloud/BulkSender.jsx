@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { toast } from '../../Components';
+import { toast } from '../../Components/Toast';
 import { buildTemplatePayload, whatsappCloudService } from '../../services/whatsappCloudService';
 import TemplateSelector from './TemplateSelector';
 
