@@ -197,6 +197,21 @@ export const deleteAutoReplyRule = (id) =>
 export const toggleAutoReplyRule = (id) =>
   apiClient.patch(`/api/whatsapp/auto-reply/${id}/toggle`);
 
+
+export const fetchManagedUsers = () => apiClient.get('/api/users/manage');
+export const createManagedUser = (payload) =>
+  apiClient.post('/api/users/manage', payload, {
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+export const updateManagedUser = (id, payload) =>
+  apiClient.put(`/api/users/manage/${id}`, payload, {
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+
 export const uploadToCloudinary = async ({ file, type, cloudName, uploadPreset }) => {
   const resolvedCloudName =
     cloudName || import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || 'dadcprflr';
@@ -258,6 +273,9 @@ export const whatsappCloudService = {
   getConnectConfig: fetchWhatsAppConnectConfig,
   completeConnect: completeWhatsAppConnect,
   connectManual: connectWhatsAppManual,
+  fetchManagedUsers,
+  createManagedUser,
+  updateManagedUser,
   activateAccount: activateWhatsAppAccount,
   disconnectAccount: disconnectWhatsAppAccount,
   deleteAccount: deleteWhatsAppAccount,

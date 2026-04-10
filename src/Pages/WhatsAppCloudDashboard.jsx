@@ -58,6 +58,7 @@ const BulkSender = lazy(() => import('../Components/whatsappCloud/BulkSender'));
 const AutoReplyManagementPanel = lazy(() => import('../Components/whatsappCloud/AutoReplyManagementPanel'));
 const AnalyticsDashboard = lazy(() => import('../Components/whatsappCloud/AnalyticsDashboard'));
 const WhatsAppAttendanceSettings = lazy(() => import('../Components/whatsappCloud/WhatsAppAttendanceSettings'));
+const AdminUserManagementPanel = lazy(() => import('../Components/whatsappCloud/AdminUserManagementPanel'));
 
 const navItems = [
   { key: 'inbox', label: 'Chats', icon: <ChatRoundedIcon /> },
@@ -116,7 +117,6 @@ const SectionSurface = ({ children }) => (
 export default function WhatsAppCloudDashboard() {
   const isDesktop = useMediaQuery((theme) => theme.breakpoints.up('lg'));
   const isMobile = useMediaQuery((theme) => theme.breakpoints.down('md'));
-  const [activeTab, setActiveTab] = useState('inbox');
   const [search, setSearch] = useState('');
   const [connectionState, setConnectionState] = useState('loading');
   const [connectionStatus, setConnectionStatus] = useState('Checking...');
@@ -148,8 +148,27 @@ export default function WhatsAppCloudDashboard() {
   } = useAuth();
   const outletContext = useOutletContext() || {};
 
+  const isAdminUser = String(userGroup || '').toLowerCase() === 'admin';
+  const [activeTab, setActiveTab] = useState(isAdminUser ? 'settings' : 'inbox');
+
+  useEffect(() => {
+    if (isAdminUser) {
+      setActiveTab((prev) => (prev === 'settings' ? prev : 'settings'));
+    }
+  }, [isAdminUser]);
+
   useEffect(() => {
     let active = true;
+
+    if (isAdminUser) {
+      setConnectionState('connected');
+      setConnectionStatus('Admin');
+      setStatusError('');
+      setLastCheckedAt(new Date());
+      return () => {
+        active = false;
+      };
+    }
 
     const refreshConnectionStatus = async () => {
       if (!active) return;
@@ -306,6 +325,10 @@ export default function WhatsAppCloudDashboard() {
   }, [manualForm, refreshWhatsAppAccount, resetManualForm]);
 
   const sectionNode = useMemo(() => {
+    if (isAdminUser && activeTab === 'settings') {
+      return <AdminUserManagementPanel />;
+    }
+
     if (!isAccountConnected && activeTab !== 'settings') {
       return (
         <Stack alignItems="center" justifyContent="center" spacing={1.5} sx={{ height: '100%', minHeight: 260, textAlign: 'center', px: 3 }}>
@@ -363,6 +386,8 @@ export default function WhatsAppCloudDashboard() {
     whatsappAccountStatus,
     accountConnectionMode,
     whatsappAccount,
+    isAdminUser,
+    userGroup,
   ]);
 
   const connectionChipColor =

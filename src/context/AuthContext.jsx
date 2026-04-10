@@ -44,10 +44,17 @@ export function AuthProvider({ children }) {
 
     persistAuthState(nextUser);
     setUser(nextUser);
-  }, []);
+  }, [user?.userGroup]);
 
   const refreshWhatsAppAccount = useCallback(async () => {
     if (!getStoredToken()) {
+      setWhatsappAccount(null);
+      setWhatsappAccountStatus('not_connected');
+      setIsAccountLoading(false);
+      return null;
+    }
+
+    if (String(user?.userGroup || '').toLowerCase() === 'admin') {
       setWhatsappAccount(null);
       setWhatsappAccountStatus('not_connected');
       setIsAccountLoading(false);
@@ -74,7 +81,7 @@ export function AuthProvider({ children }) {
     } finally {
       setIsAccountLoading(false);
     }
-  }, []);
+  }, [user?.userGroup]);
 
   const logout = useCallback(() => {
     clearStoredSession();
@@ -83,7 +90,7 @@ export function AuthProvider({ children }) {
     setWhatsappAccount(null);
     setWhatsappAccountStatus('idle');
     setIsAccountLoading(false);
-  }, []);
+  }, [user?.userGroup]);
 
   useEffect(() => {
     if (token) {
@@ -103,6 +110,7 @@ export function AuthProvider({ children }) {
       userGroup: user.userGroup,
       mobileNumber: user.mobileNumber,
       isAuthenticated: Boolean(token),
+      isAdmin: String(user.userGroup || '').toLowerCase() === 'admin',
       whatsappAccount,
       whatsappAccountStatus,
       isAccountLoading,
