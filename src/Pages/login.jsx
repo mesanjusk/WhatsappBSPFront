@@ -48,7 +48,7 @@ export default function Login() {
       const data = response?.data || {};
 
       if (!data.success || !data.token) {
-        setErrorText(data.message || 'Login failed. Please check username and password.');
+        setErrorText(data.message || 'Login failed Please check username and password.');
         return;
       }
 
