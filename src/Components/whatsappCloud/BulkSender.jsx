@@ -37,7 +37,7 @@ export default function BulkSender({ standalone, search }) {
   };
 
   const sendBulkMessages = async () => {
-    if (numbers.length === 0) return void toast.error('Please provide at least one recipient number.');
+    if (numbers.length === 0) return void toast.error('Please provide at least 1 recipient number.');
     if (!template?.name || !template?.language) return void toast.error('Please select a template first.');
 
     setIsSending(true);
