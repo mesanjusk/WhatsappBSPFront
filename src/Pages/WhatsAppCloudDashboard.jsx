@@ -41,8 +41,10 @@ import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded';
 import MoreVertRoundedIcon from '@mui/icons-material/MoreVertRounded';
 import { toast } from '../Components/Toast';
 import {
+  activateWhatsAppAccount,
   connectWhatsAppManual,
   completeWhatsAppConnect,
+  fetchWhatsAppAccounts,
   fetchWhatsAppConnectConfig,
   disconnectWhatsAppAccount,
   fetchWhatsAppAccount,
@@ -142,6 +144,7 @@ export default function WhatsAppCloudDashboard() {
     accessToken: '',
     phoneNumberId: '',
     businessAccountId: '',
+    wabaId: '',
     displayPhoneNumber: '',
     verifiedName: '',
   });
@@ -154,6 +157,20 @@ export default function WhatsAppCloudDashboard() {
     try {
       const response = await fetchWhatsAppAccount();
       const account = getAccountPayload(response);
+      if (!account) {
+        try {
+          const accountsResponse = await fetchWhatsAppAccounts();
+          const fallbackAccount = getAccountPayload(accountsResponse);
+          if (fallbackAccount?.id) {
+            await activateWhatsAppAccount(fallbackAccount.id);
+            setWhatsappAccount(fallbackAccount);
+            setWhatsappAccountStatus(fallbackAccount?.status || 'connected');
+            return;
+          }
+        } catch (activationError) {
+          console.error('Could not activate fallback WhatsApp account', activationError);
+        }
+      }
       setWhatsappAccount(account);
       setWhatsappAccountStatus(account?.status || (account ? 'connected' : 'not_connected'));
     } catch (error) {
@@ -302,6 +319,7 @@ export default function WhatsAppCloudDashboard() {
       accessToken: '',
       phoneNumberId: '',
       businessAccountId: '',
+      wabaId: '',
       displayPhoneNumber: '',
       verifiedName: '',
     });
@@ -309,8 +327,12 @@ export default function WhatsAppCloudDashboard() {
   }, []);
 
   const handleManualConnect = useCallback(async () => {
-    if (!manualForm.accessToken || !manualForm.phoneNumberId || !manualForm.businessAccountId) {
-      setManualFormError('Access token, Phone number ID, and Business account ID are required.');
+    if (!manualForm.accessToken || !manualForm.phoneNumberId) {
+      setManualFormError('Access token and Phone number ID are required.');
+      return;
+    }
+    if (!manualForm.businessAccountId && !manualForm.wabaId) {
+      setManualFormError('Provide at least one value: Business account ID or WABA ID.');
       return;
     }
     setManualFormError('');
@@ -319,8 +341,8 @@ export default function WhatsAppCloudDashboard() {
       await connectWhatsAppManual({
         accessToken: manualForm.accessToken,
         phoneNumberId: manualForm.phoneNumberId,
-        businessAccountId: manualForm.businessAccountId,
-        wabaId: manualForm.businessAccountId,
+        businessAccountId: manualForm.businessAccountId || undefined,
+        wabaId: manualForm.wabaId || manualForm.businessAccountId || undefined,
         displayPhoneNumber: manualForm.displayPhoneNumber || undefined,
         verifiedName: manualForm.verifiedName || undefined,
       });
@@ -598,6 +620,14 @@ export default function WhatsAppCloudDashboard() {
             secondaryTypographyProps={{ variant: 'caption', color: 'text.secondary' }}
           />
         </MenuItem>
+        {(whatsappAccount?.verified_name || accountConnectionMode) ? (
+          <MenuItem disabled sx={{ opacity: '1 !important' }}>
+            <ListItemText
+              primary={[whatsappAccount?.verified_name, accountConnectionMode ? `Mode: ${accountConnectionMode}` : null].filter(Boolean).join(' • ')}
+              primaryTypographyProps={{ variant: 'caption', color: 'text.secondary' }}
+            />
+          </MenuItem>
+        ) : null}
         <MenuItem onClick={() => { handleConnectFlow(); setMobileMenuAnchorEl(null); }}>
           <ListItemIcon><SettingsRoundedIcon fontSize="small" /></ListItemIcon>
           <ListItemText primary="Connect with Meta" />
@@ -655,10 +685,14 @@ export default function WhatsAppCloudDashboard() {
               onChange={(event) => setManualForm((prev) => ({ ...prev, phoneNumberId: event.target.value }))}
             />
             <TextField
-              required
-              label="Business account ID / WABA ID"
+              label="Business account ID"
               value={manualForm.businessAccountId}
               onChange={(event) => setManualForm((prev) => ({ ...prev, businessAccountId: event.target.value }))}
+            />
+            <TextField
+              label="WABA ID"
+              value={manualForm.wabaId}
+              onChange={(event) => setManualForm((prev) => ({ ...prev, wabaId: event.target.value }))}
             />
             <TextField
               label="Display phone number (optional)"

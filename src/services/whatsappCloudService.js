@@ -54,7 +54,9 @@ const WHATSAPP_ACCOUNT_ENDPOINTS = {
   connectConfig: ['/api/whatsapp/connect/config'],
   connectComplete: ['/api/whatsapp/connect/complete'],
   connectManual: ['/api/whatsapp/connect/manual'],
-  disconnect: ['/api/whatsapp/account/:id', '/api/whatsapp/accounts/:id'],
+  activate: ['/api/whatsapp/accounts/:id/activate'],
+  disconnect: ['/api/whatsapp/account/:id/disconnect', '/api/whatsapp/accounts/:id/disconnect'],
+  remove: ['/api/whatsapp/account/:id', '/api/whatsapp/accounts/:id'],
   revalidate: ['/api/whatsapp/account/:id/revalidate', '/api/whatsapp/accounts/:id/revalidate'],
 };
 
@@ -111,10 +113,27 @@ export const connectWhatsAppManual = (payload) =>
     })
   );
 export const activateWhatsAppAccount = (accountId) =>
-  apiClient.post(`/api/whatsapp/accounts/${accountId}/activate`);
+  tryEndpoints(
+    WHATSAPP_ACCOUNT_ENDPOINTS.activate.map((endpoint) => endpoint.replace(':id', accountId)),
+    (endpoint) => apiClient.post(endpoint)
+  );
 export const disconnectWhatsAppAccount = (accountId) =>
   tryEndpoints(
-    WHATSAPP_ACCOUNT_ENDPOINTS.disconnect.map((endpoint) => endpoint.replace(':id', accountId)),
+    [
+      ...WHATSAPP_ACCOUNT_ENDPOINTS.disconnect.map((endpoint) => ({
+        endpoint: endpoint.replace(':id', accountId),
+        method: 'post',
+      })),
+      ...WHATSAPP_ACCOUNT_ENDPOINTS.remove.map((endpoint) => ({
+        endpoint: endpoint.replace(':id', accountId),
+        method: 'delete',
+      })),
+    ],
+    ({ endpoint, method }) => apiClient[method](endpoint)
+  );
+export const deleteWhatsAppAccount = (accountId) =>
+  tryEndpoints(
+    WHATSAPP_ACCOUNT_ENDPOINTS.remove.map((endpoint) => endpoint.replace(':id', accountId)),
     (endpoint) => apiClient.delete(endpoint)
   );
 export const revalidateWhatsAppAccount = (accountId) =>
@@ -241,6 +260,7 @@ export const whatsappCloudService = {
   connectManual: connectWhatsAppManual,
   activateAccount: activateWhatsAppAccount,
   disconnectAccount: disconnectWhatsAppAccount,
+  deleteAccount: deleteWhatsAppAccount,
   revalidateAccount: revalidateWhatsAppAccount,
   getAutoReplyRules,
   createAutoReplyRule,
