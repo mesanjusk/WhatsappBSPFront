@@ -1,166 +1,155 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import LoginRoundedIcon from '@mui/icons-material/LoginRounded';
+import LockRoundedIcon from '@mui/icons-material/LockRounded';
+import PersonRoundedIcon from '@mui/icons-material/PersonRounded';
+import ChatRoundedIcon from '@mui/icons-material/ChatRounded';
 import {
   Alert,
   Box,
   Button,
-  Card,
-  CardContent,
   CircularProgress,
   InputAdornment,
+  Paper,
   Stack,
   TextField,
   Typography,
 } from '@mui/material';
-import PersonRoundedIcon from '@mui/icons-material/PersonRounded';
-import LockRoundedIcon from '@mui/icons-material/LockRounded';
-import LoginRoundedIcon from '@mui/icons-material/LoginRounded';
-import axios from '../apiClient.js';
-import { MobileContainer, toast } from '../Components';
+import { useNavigate } from 'react-router-dom';
+import apiClient from '../apiClient';
+import { toast } from '../Components/Toast';
+import { ROUTES } from '../constants/routes';
 import { useAuth } from '../context/AuthContext';
-import { setStoredToken } from '../utils/authStorage';
-
-const BACKEND_BASE = import.meta.env.VITE_API_SERVER || 'https://misbackend-e078.onrender.com';
 
 export default function Login() {
   const navigate = useNavigate();
-  const [User_name, setUser_Name] = useState('');
-  const [Password, setPassword] = useState('');
+  const { login, isAuthenticated } = useAuth();
+  const [userName, setUserName] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorText, setErrorText] = useState('');
-  const { setAuthData, userName, userGroup } = useAuth();
 
   useEffect(() => {
-    if (!userName) return;
-
-    const target = userGroup === 'Vendor' ? '/vendorHome' : '/home';
-    navigate(target, { replace: true });
-  }, [navigate, userGroup, userName]);
-
-  async function checkGoogleDriveAndRedirect(userGroupValue) {
-    try {
-      const statusRes = await axios.get('/api/google-drive/status');
-      const connected = !!statusRes?.data?.connected;
-
-      if (!connected) {
-        const returnTo = userGroupValue === 'Vendor' ? `${window.location.origin}/vendorHome` : `${window.location.origin}/home`;
-
-        window.location.href = `${BACKEND_BASE}/api/google-drive/connect?returnTo=${encodeURIComponent(returnTo)}`;
-        return;
-      }
-
-      const target = userGroupValue === 'Vendor' ? '/vendorHome' : '/home';
-      navigate(target, { replace: true });
-    } catch (error) {
-      console.error('Google Drive status check failed:', error);
-      const target = userGroupValue === 'Vendor' ? '/vendorHome' : '/home';
-      navigate(target, { replace: true });
+    if (isAuthenticated) {
+      navigate(ROUTES.WHATSAPP, { replace: true });
     }
-  }
+  }, [isAuthenticated, navigate]);
 
-  async function submit(e) {
-    e.preventDefault();
+  const submit = async (event) => {
+    event.preventDefault();
     setLoading(true);
     setErrorText('');
 
     try {
-      const response = await axios.post('/user/login', {
-        User_name,
-        Password,
+      const response = await apiClient.post('/user/login', {
+        User_name: userName,
+        Password: password,
       });
 
-      const data = response.data;
+      const data = response?.data || {};
 
-      if (data.status === 'notexist') {
-        setErrorText('User has not signed up.');
-        setLoading(false);
-        return;
-      }
+      if (data.status === 'notexist') return void setErrorText('User has not signed up.');
+      if (data.status === 'invalid') return void setErrorText('Invalid credentials. Please check username and password.');
+      if (!data.token) return void setErrorText('Login succeeded but token was not received from the server.');
 
-      if (data.status === 'invalid') {
-        setErrorText('Invalid credentials. Please check username and password.');
-        setLoading(false);
-        return;
-      }
-
-      if (!data.token) {
-        setErrorText('Login succeeded but token was not received from the server.');
-        console.error('Token missing in response:', data);
-        setLoading(false);
-        return;
-      }
-
-      setStoredToken(data.token);
-
-      setAuthData({
-        userName: User_name,
-        userGroup: data.userGroup,
+      login(data.token, {
+        userName,
+        userGroup: data.userGroup || '',
         mobileNumber: data.userMobile || data.userMob || '',
       });
 
-      toast.success('Login successful. Redirecting...');
-      await checkGoogleDriveAndRedirect(data.userGroup);
-    } catch (error) {
-      console.error('Login error:', error);
-      setErrorText('An error occurred during login. Please try again.');
+      toast.success('Login successful.');
+      navigate(ROUTES.WHATSAPP, { replace: true });
+    } catch {
+      setErrorText('Login failed. Please try again.');
     } finally {
       setLoading(false);
     }
-  }
+  };
 
   return (
-    <Box sx={{ minHeight: '100vh', display: 'grid', placeItems: 'center', px: 2 }}>
-      <MobileContainer maxWidth="sm">
-        <Card sx={{ maxWidth: 460, mx: 'auto' }}>
-          <CardContent sx={{ p: { xs: 3, md: 4 } }}>
-            <Stack spacing={3} component="form" onSubmit={submit}>
-              <Box>
-                <Typography variant="h5" fontWeight={700} gutterBottom>
-                  Welcome back
-                </Typography>
-                <Typography color="text.secondary">Sign in to access your MIS dashboard.</Typography>
-              </Box>
+    <Box
+      sx={{
+        minHeight: '100dvh',
+        display: 'grid',
+        gridTemplateColumns: { xs: '1fr', lg: '1fr minmax(420px, 520px)' },
+        bgcolor: '#111b21',
+      }}
+    >
+      <Stack
+        sx={{
+          display: { xs: 'none', lg: 'flex' },
+          justifyContent: 'center',
+          p: 6,
+          color: '#e9edef',
+          background: 'linear-gradient(160deg, #0b141a 0%, #111b21 50%, #10352f 100%)',
+        }}
+        spacing={2}
+      >
+        <Stack direction="row" spacing={1.5} alignItems="center">
+          <ChatRoundedIcon sx={{ color: '#25d366', fontSize: 32 }} />
+          <Typography variant="h4" fontWeight={700}>WhatsApp BSP</Typography>
+        </Stack>
+        <Typography variant="h6" sx={{ maxWidth: 540 }}>
+          Manage customer conversations, broadcast campaigns, templates, and automation from a single WhatsApp-native workspace.
+        </Typography>
+      </Stack>
 
-              {errorText && <Alert severity="error">{errorText}</Alert>}
+      <Box sx={{ display: 'grid', placeItems: 'center', p: { xs: 2, md: 3 } }}>
+        <Paper sx={{ width: '100%', maxWidth: 460, p: { xs: 3, sm: 4 }, borderRadius: 4 }}>
+          <Stack spacing={3} component="form" onSubmit={submit}>
+            <Box>
+              <Typography variant="h5" fontWeight={700} gutterBottom>
+                Sign in
+              </Typography>
+              <Typography color="text.secondary">Access your WhatsApp Business workspace.</Typography>
+            </Box>
 
-              <TextField
-                label="User Name"
-                autoComplete="username"
-                value={User_name}
-                onChange={(e) => setUser_Name(e.target.value)}
-                required
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <PersonRoundedIcon fontSize="small" />
-                    </InputAdornment>
-                  ),
-                }}
-              />
+            {errorText ? <Alert severity="error">{errorText}</Alert> : null}
 
-              <TextField
-                label="Password"
-                type="password"
-                autoComplete="current-password"
-                value={Password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <LockRoundedIcon fontSize="small" />
-                    </InputAdornment>
-                  ),
-                }}
-              />
+            <TextField
+              label="User Name"
+              autoComplete="username"
+              value={userName}
+              onChange={(e) => setUserName(e.target.value)}
+              required
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <PersonRoundedIcon fontSize="small" />
+                  </InputAdornment>
+                ),
+              }}
+            />
 
-              <Button type="submit" variant="contained" fullWidth disabled={loading} endIcon={loading ? <CircularProgress size={18} color="inherit" /> : <LoginRoundedIcon />}>
-                {loading ? 'Please wait...' : 'Sign In'}
-              </Button>
-            </Stack>
-          </CardContent>
-        </Card>
-      </MobileContainer>
+            <TextField
+              label="Password"
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <LockRoundedIcon fontSize="small" />
+                  </InputAdornment>
+                ),
+              }}
+            />
+
+            <Button
+              type="submit"
+              variant="contained"
+              size="large"
+              fullWidth
+              disabled={loading}
+              endIcon={loading ? <CircularProgress size={18} color="inherit" /> : <LoginRoundedIcon />}
+            >
+              {loading ? 'Please wait...' : 'Continue'}
+            </Button>
+          </Stack>
+        </Paper>
+      </Box>
     </Box>
   );
 }

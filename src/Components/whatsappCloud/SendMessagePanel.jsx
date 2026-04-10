@@ -1,44 +1,43 @@
 import { useState } from 'react';
+import PropTypes from 'prop-types';
+import { Box, Paper, Stack, TextField, Typography } from '@mui/material';
 import TemplateMessageComposer from './TemplateMessageComposer';
 import BulkSender from './BulkSender';
 
-const initialForm = {
-  to: '',
-};
+const initialForm = { to: '' };
 
-export default function SendMessagePanel() {
+export default function SendMessagePanel({ search }) {
   const [form, setForm] = useState(initialForm);
-  const handleChange = (key, value) => {
-    setForm((prev) => ({ ...prev, [key]: value }));
-  };
 
   return (
-    <div className="space-y-5">
-      <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-        <h3 className="text-lg font-semibold text-gray-800">Send Approved Tempate</h3>
+    <Stack spacing={2} sx={{ p: { xs: 1, md: 2 }, height: '100%', overflow: 'auto' }}>
+      <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 3 }}>
+        <Stack spacing={2}>
+          <Box>
+            <Typography variant="h6" fontWeight={700}>Template Messaging</Typography>
+            <Typography variant="body2" color="text.secondary">Send approved template messages instantly.</Typography>
+          </Box>
 
-        <div className="mt-4 grid grid-cols-1 gap-4">
-          <label className="text-sm text-gray-700">
-            Recipient Number
-            <input
-              value={form.to}
-              onChange={(event) => handleChange('to', event.target.value)}
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-              placeholder="+14155552671"
-            />
-          </label>
-
-          
-
-          <TemplateMessageComposer
-            recipient={form.to}
-            className="space-y-3"
-            buttonLabel="Send Template Message"
+          <TextField
+            value={form.to}
+            onChange={(event) => setForm((prev) => ({ ...prev, to: event.target.value }))}
+            label="Recipient number"
+            placeholder="+14155552671"
           />
-        </div>
-      </section>
 
-      <BulkSender />
-    </div>
+          <TemplateMessageComposer recipient={form.to} className="space-y-3" buttonLabel="Send Template Message" />
+        </Stack>
+      </Paper>
+
+      <BulkSender search={search} />
+    </Stack>
   );
 }
+
+SendMessagePanel.propTypes = {
+  search: PropTypes.string,
+};
+
+SendMessagePanel.defaultProps = {
+  search: '',
+};

@@ -1,22 +1,50 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  Avatar,
+  Badge,
+  BottomNavigation,
+  BottomNavigationAction,
   Box,
   Button,
   Chip,
   CircularProgress,
+  Divider,
+  IconButton,
   InputAdornment,
+  List,
+  ListItemButton,
+  ListItemIcon,
+  ListItemText,
+  Menu,
+  MenuItem,
+  Paper,
   Stack,
-  Tab,
-  Tabs,
   TextField,
+  Tooltip,
   Typography,
   useMediaQuery,
 } from '@mui/material';
+import { useOutletContext } from 'react-router-dom';
 import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
 import RefreshRoundedIcon from '@mui/icons-material/RefreshRounded';
-import { fetchWhatsAppStatus } from '../services/whatsappCloudService';
+import ChatRoundedIcon from '@mui/icons-material/ChatRounded';
+import DescriptionRoundedIcon from '@mui/icons-material/DescriptionRounded';
+import CampaignRoundedIcon from '@mui/icons-material/CampaignRounded';
+import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
+import QueryStatsRoundedIcon from '@mui/icons-material/QueryStatsRounded';
+import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded';
+import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded';
+import MoreVertRoundedIcon from '@mui/icons-material/MoreVertRounded';
+import { toast } from '../Components/Toast';
+import {
+  completeWhatsAppConnect,
+  disconnectWhatsAppAccount,
+  fetchWhatsAppAccount,
+  fetchWhatsAppStatus,
+} from '../services/whatsappCloudService';
 import { parseApiError } from '../utils/parseApiError';
-import { ErrorState, FilterToolbar, LoadingSkeleton, SectionCard } from '../Components/ui';
+import { ErrorState, LoadingSkeleton } from '../Components/ui';
+import { useAuth } from '../context/AuthContext';
 
 const MessagesPanel = lazy(() => import('../Components/whatsappCloud/MessagesPanel'));
 const SendMessagePanel = lazy(() => import('../Components/whatsappCloud/SendMessagePanel'));
@@ -26,13 +54,24 @@ const AnalyticsDashboard = lazy(() => import('../Components/whatsappCloud/Analyt
 const WhatsAppAttendanceSettings = lazy(() => import('../Components/whatsappCloud/WhatsAppAttendanceSettings'));
 
 const navItems = [
-  { key: 'inbox', label: 'Chats' },
-  { key: 'templates', label: 'Templates' },
-  { key: 'campaigns', label: 'Broadcast' },
-  { key: 'autoReply', label: 'Auto Reply' },
-  { key: 'analytics', label: 'Analytics' },
-  { key: 'settings', label: 'Settings' },
+  { key: 'inbox', label: 'Chats', icon: <ChatRoundedIcon /> },
+  { key: 'templates', label: 'Templates', icon: <DescriptionRoundedIcon /> },
+  { key: 'campaigns', label: 'Broadcast', icon: <CampaignRoundedIcon /> },
+  { key: 'autoReply', label: 'Auto Reply', icon: <AutoAwesomeRoundedIcon /> },
+  { key: 'analytics', label: 'Analytics', icon: <QueryStatsRoundedIcon /> },
+  { key: 'settings', label: 'Settings', icon: <SettingsRoundedIcon /> },
 ];
+
+const mobileTabs = navItems.filter((item) => !['analytics', 'settings'].includes(item.key));
+
+const searchPlaceholderByTab = {
+  inbox: 'Search or start new chat',
+  templates: 'Search templates',
+  campaigns: 'Search broadcasts',
+  autoReply: 'Search auto replies',
+  analytics: 'Search analytics',
+  settings: 'Search settings',
+};
 
 const getFriendlyStatusError = (error) => {
   const statusCode = error?.response?.status;
@@ -42,8 +81,34 @@ const getFriendlyStatusError = (error) => {
   return parseApiError(error, 'Unable to check WhatsApp status right now.');
 };
 
+const getAccountPayload = (response) => {
+  const data = response?.data?.data ?? response?.data ?? null;
+  if (Array.isArray(data)) return data[0] || null;
+  if (Array.isArray(data?.items)) return data.items[0] || null;
+  if (data?.account) return data.account;
+  return data;
+};
+
+const SectionSurface = ({ children }) => (
+  <Paper
+    variant="outlined"
+    sx={{
+      height: '100%',
+      minHeight: 0,
+      borderRadius: { xs: 0, lg: 4 },
+      overflow: 'hidden',
+      borderColor: 'rgba(17, 27, 33, 0.12)',
+      boxShadow: { lg: '0 24px 55px rgba(17, 27, 33, 0.14)' },
+      bgcolor: '#f7f8fa',
+    }}
+  >
+    {children}
+  </Paper>
+);
+
 export default function WhatsAppCloudDashboard() {
-  const isDesktop = useMediaQuery((theme) => theme.breakpoints.up('md'));
+  const isDesktop = useMediaQuery((theme) => theme.breakpoints.up('lg'));
+  const isMobile = useMediaQuery((theme) => theme.breakpoints.down('md'));
   const [activeTab, setActiveTab] = useState('inbox');
   const [search, setSearch] = useState('');
   const [connectionState, setConnectionState] = useState('loading');
@@ -51,20 +116,49 @@ export default function WhatsAppCloudDashboard() {
   const [statusError, setStatusError] = useState('');
   const [lastCheckedAt, setLastCheckedAt] = useState(null);
   const [statusTick, setStatusTick] = useState(0);
+  const [whatsappAccount, setWhatsappAccount] = useState(null);
+  const [isAccountLoading, setIsAccountLoading] = useState(true);
+  const [isAccountActionLoading, setIsAccountActionLoading] = useState(false);
+  const [mobileMenuAnchorEl, setMobileMenuAnchorEl] = useState(null);
+  const { userName, userGroup, mobileNumber } = useAuth();
+  const outletContext = useOutletContext() || {};
+
+  const loadAccount = useCallback(async () => {
+    setIsAccountLoading(true);
+    try {
+      const response = await fetchWhatsAppAccount();
+      setWhatsappAccount(getAccountPayload(response));
+    } catch (error) {
+      const statusCode = error?.response?.status;
+      if (statusCode === 404 || statusCode === 204) {
+        setWhatsappAccount(null);
+        return;
+      }
+      setWhatsappAccount(null);
+      toast.error(parseApiError(error, 'Unable to load WhatsApp account.'));
+    } finally {
+      setIsAccountLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadAccount();
+  }, [loadAccount]);
 
   useEffect(() => {
     let active = true;
 
     const refreshConnectionStatus = async () => {
       if (!active) return;
-
       setConnectionState((prev) => (prev === 'connected' || prev === 'disconnected' ? prev : 'loading'));
       setStatusError('');
 
       try {
         const res = await fetchWhatsAppStatus();
         const data = res?.data;
-        const isConnected = data?.status === 'connected' || (Array.isArray(data?.data) && data.data.some((acc) => acc?.status === 'connected'));
+        const isConnected =
+          data?.status === 'connected' ||
+          (Array.isArray(data?.data) && data.data.some((acc) => acc?.status === 'connected'));
 
         if (!active) return;
         setConnectionState(isConnected ? 'connected' : 'disconnected');
@@ -81,122 +175,180 @@ export default function WhatsAppCloudDashboard() {
 
     refreshConnectionStatus();
     const interval = setInterval(refreshConnectionStatus, 12000);
-
     return () => {
       active = false;
       clearInterval(interval);
     };
   }, [statusTick]);
 
-  const renderSection = useMemo(() => {
+  const isAccountConnected = connectionState === 'connected' && Boolean(whatsappAccount);
+
+  const handleConnectFlow = useCallback(async () => {
+    setIsAccountActionLoading(true);
+    try {
+      let payload = {};
+      if (typeof window !== 'undefined') {
+        const signupToken = window.prompt('Paste signup token/code from Meta Embedded Signup');
+        if (!signupToken) return;
+        payload = { signupToken };
+      }
+
+      await completeWhatsAppConnect(payload);
+      await loadAccount();
+      setStatusTick((prev) => prev + 1);
+      toast.success('WhatsApp account connected.');
+    } catch (error) {
+      toast.error(parseApiError(error, 'Could not complete WhatsApp connect.'));
+    } finally {
+      setIsAccountActionLoading(false);
+    }
+  }, [loadAccount]);
+
+  const handleDisconnect = useCallback(async (accountId) => {
+    if (!accountId) return;
+    setIsAccountActionLoading(true);
+    try {
+      await disconnectWhatsAppAccount(accountId);
+      await loadAccount();
+      setStatusTick((prev) => prev + 1);
+      toast.success('WhatsApp account disconnected.');
+    } catch (error) {
+      toast.error(parseApiError(error, 'Could not disconnect account.'));
+    } finally {
+      setIsAccountActionLoading(false);
+    }
+  }, [loadAccount]);
+
+  const sectionNode = useMemo(() => {
+    if (!isAccountConnected && activeTab !== 'settings') {
+      return (
+        <Stack alignItems="center" justifyContent="center" spacing={1.5} sx={{ height: '100%', minHeight: 260, textAlign: 'center', px: 3 }}>
+          <Typography variant="h6" fontWeight={700}>
+            Connect your WhatsApp account to start using the dashboard
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            This workspace is account-aware. Connect your own number to load chats, templates, and broadcasts.
+          </Typography>
+          <Stack direction="row" spacing={1.25}>
+            <Button variant="contained" onClick={handleConnectFlow} disabled={isAccountActionLoading}>
+              {isAccountActionLoading ? 'Connecting...' : 'Connect account'}
+            </Button>
+            <Button variant="outlined" onClick={() => { loadAccount(); setStatusTick((prev) => prev + 1); }} disabled={isAccountLoading}>
+              Refresh status
+            </Button>
+          </Stack>
+        </Stack>
+      );
+    }
+
     if (activeTab === 'inbox') return <MessagesPanel search={search} />;
-    if (activeTab === 'templates') return <SendMessagePanel />;
-    if (activeTab === 'campaigns') return <BulkSender />;
-    if (activeTab === 'autoReply') return <AutoReplyManagementPanel />;
+    if (activeTab === 'templates') return <SendMessagePanel search={search} />;
+    if (activeTab === 'campaigns') return <BulkSender standalone search={search} />;
+    if (activeTab === 'autoReply') return <AutoReplyManagementPanel search={search} />;
     if (activeTab === 'analytics') return <AnalyticsDashboard />;
-    return <WhatsAppAttendanceSettings />;
-  }, [activeTab, search]);
+    return (
+      <WhatsAppAttendanceSettings
+        whatsappAccount={whatsappAccount}
+        isAccountConnected={isAccountConnected}
+        isAccountLoading={isAccountLoading}
+        onConnect={handleConnectFlow}
+        onDisconnect={handleDisconnect}
+        onRefreshAccount={loadAccount}
+        accountActionLoading={isAccountActionLoading}
+      />
+    );
+  }, [
+    activeTab,
+    handleConnectFlow,
+    handleDisconnect,
+    isAccountActionLoading,
+    isAccountConnected,
+    isAccountLoading,
+    loadAccount,
+    search,
+    whatsappAccount,
+  ]);
 
   const connectionChipColor =
-    connectionState === 'connected'
-      ? 'success'
-      : connectionState === 'loading'
-        ? 'warning'
-        : 'error';
+    connectionState === 'connected' ? 'success' : connectionState === 'loading' ? 'warning' : 'error';
+
+  const mobileMenuOpen = Boolean(mobileMenuAnchorEl);
+  const lastSyncLabel = lastCheckedAt
+    ? `Last sync ${lastCheckedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+    : 'Last sync pending';
+  const activeNavLabel = navItems.find((n) => n.key === activeTab)?.label || 'Chats';
+  const mobileTabValue = mobileTabs.some((item) => item.key === activeTab) ? activeTab : false;
+  const mobileUserMeta = userGroup || mobileNumber || 'No profile details';
 
   return (
-    <Box sx={{ px: { xs: 0.5, md: 1 }, pb: { xs: 0.5, md: 0.75 } }}>
-      <SectionCard
-        contentSx={{
-          p: 0,
-          height: { xs: 'calc(100dvh - 8.3rem)', md: 'calc(100dvh - 7.4rem)' },
-          minHeight: { xs: 520, md: 620 },
-        }}
-      >
-        <Box
+    <Box
+      sx={{
+        minHeight: '100dvh',
+        display: 'grid',
+        gridTemplateColumns: { lg: '72px minmax(0, 1fr)' },
+        bgcolor: { xs: '#e9edef', lg: '#111b21' },
+      }}
+    >
+      {isDesktop ? (
+        <Box sx={{ bgcolor: '#111b21', color: '#cfd4d8', borderRight: '1px solid rgba(255,255,255,0.08)' }}>
+          <Stack alignItems="center" sx={{ py: 2.5, height: '100%' }}>
+            <Avatar sx={{ bgcolor: '#25d366', color: '#072f25', fontWeight: 700, mb: 2 }}>WA</Avatar>
+            <List dense sx={{ width: '100%', px: 1 }}>
+              {navItems.map((item) => (
+                <ListItemButton
+                  key={item.key}
+                  selected={activeTab === item.key}
+                  onClick={() => setActiveTab(item.key)}
+                  sx={{
+                    borderRadius: 2,
+                    mb: 0.5,
+                    minHeight: 48,
+                    justifyContent: 'center',
+                    '&.Mui-selected': { bgcolor: '#202c33', color: '#25d366' },
+                  }}
+                >
+                  <Tooltip title={item.label} placement="right">
+                    <ListItemIcon sx={{ color: 'inherit', minWidth: 0 }}>{item.icon}</ListItemIcon>
+                  </Tooltip>
+                </ListItemButton>
+              ))}
+            </List>
+            <Box sx={{ mt: 'auto' }}>
+              <Tooltip title={userName || 'Profile'}>
+                <Avatar sx={{ width: 36, height: 36, mb: 1 }}>{(userName || 'U').slice(0, 1).toUpperCase()}</Avatar>
+              </Tooltip>
+              <Tooltip title="Logout">
+                <IconButton sx={{ color: '#cfd4d8' }} onClick={outletContext.onLogout}>
+                  <LogoutRoundedIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            </Box>
+          </Stack>
+        </Box>
+      ) : null}
+
+      <Stack sx={{ minWidth: 0, minHeight: '100dvh', pb: { xs: 8, md: 0 } }}>
+        <Paper
+          square
+          elevation={0}
           sx={{
-            display: 'flex',
-            height: '100%',
-            minHeight: 0,
-            overflow: 'hidden',
-            borderRadius: 1.5,
-            bgcolor: '#111b21',
+            px: { xs: 2, lg: 2.5 },
+            py: { xs: 1.5, lg: 1.25 },
+            borderBottom: '1px solid',
+            borderColor: 'divider',
+            bgcolor: { xs: '#075e54', lg: '#f0f2f5' },
+            color: { xs: '#fff', lg: 'text.primary' },
+            position: 'sticky',
+            top: 0,
+            zIndex: 10,
           }}
         >
-          <Box
-            sx={{
-              width: 220,
-              borderRight: '1px solid rgba(255,255,255,0.08)',
-              bgcolor: '#111b21',
-              color: '#e9edef',
-              p: 1.5,
-              display: { xs: 'none', md: 'block' },
-            }}
-          >
-            <Typography variant="subtitle1" fontWeight={700} color="#e9edef">
-              WhatsApp
-            </Typography>
-            <Typography variant="caption" color="rgba(233,237,239,0.72)">
-              Web-style workspace
-            </Typography>
-
-            <Tabs
-              orientation="vertical"
-              variant="scrollable"
-              value={activeTab}
-              onChange={(_, value) => setActiveTab(value)}
-              sx={{
-                mt: 1.25,
-                '& .MuiTabs-flexContainer': { gap: 0.75 },
-                '& .MuiTabs-indicator': { left: 0, width: 3, borderRadius: 4, bgcolor: '#25d366' },
-              }}
-            >
-              {navItems.map((item) => (
-                <Tab
-                  key={item.key}
-                  value={item.key}
-                  label={item.label}
-                  disableRipple
-                  sx={{
-                    alignItems: 'flex-start',
-                    justifyContent: 'center',
-                    textAlign: 'left',
-                    textTransform: 'none',
-                    fontWeight: 600,
-                    fontSize: '0.82rem',
-                    px: 1.25,
-                    py: 0.9,
-                    borderRadius: 1.5,
-                    minHeight: 38,
-                    color: '#cfd4d8',
-                    '&.Mui-selected': {
-                      bgcolor: '#202c33',
-                      color: '#25d366',
-                    },
-                  }}
-                />
-              ))}
-            </Tabs>
-          </Box>
-
-          <Stack sx={{ minWidth: 0, flex: 1, bgcolor: '#f0f2f5' }}>
-            <FilterToolbar>
-              <TextField
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search or start new chat"
-                size="small"
-                sx={{ minWidth: { xs: '100%', sm: 320 }, flex: { md: 1 } }}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchRoundedIcon fontSize="small" />
-                    </InputAdornment>
-                  ),
-                }}
-              />
-
-              <Stack direction="row" spacing={1} alignItems="center" sx={{ flexWrap: 'wrap', rowGap: 0.5 }}>
+          <Stack spacing={1}>
+            <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
+              <Typography variant="h6" fontWeight={700}>
+                {isMobile ? activeNavLabel : 'WhatsApp Business Hub'}
+              </Typography>
+              <Stack direction="row" spacing={1} alignItems="center">
                 <Chip
                   color={connectionChipColor}
                   size="small"
@@ -204,75 +356,149 @@ export default function WhatsAppCloudDashboard() {
                     connectionState === 'loading' ? (
                       <Stack direction="row" alignItems="center" spacing={0.75}>
                         <CircularProgress size={12} color="inherit" />
-                        <span>WhatsApp {connectionStatus}</span>
+                        <span>{connectionStatus}</span>
                       </Stack>
-                    ) : `WhatsApp ${connectionStatus}`
+                    ) : (
+                      connectionStatus
+                    )
                   }
                 />
-                <Typography variant="caption" color="text.secondary">
-                  {lastCheckedAt
-                    ? `Last checked ${lastCheckedAt.toLocaleTimeString([], {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        second: '2-digit',
-                      })}`
-                    : 'Checking status...'}
-                </Typography>
-                <Button
+                <IconButton
                   size="small"
-                  startIcon={<RefreshRoundedIcon fontSize="small" />}
                   onClick={() => setStatusTick((prev) => prev + 1)}
+                  sx={{ color: { xs: '#fff', lg: 'text.primary' } }}
                 >
-                  Refresh
-                </Button>
+                  <RefreshRoundedIcon fontSize="small" />
+                </IconButton>
+                {isMobile ? (
+                  <IconButton
+                    size="small"
+                    onClick={(event) => setMobileMenuAnchorEl(event.currentTarget)}
+                    sx={{ color: '#fff' }}
+                    aria-label="More options"
+                  >
+                    <MoreVertRoundedIcon fontSize="small" />
+                  </IconButton>
+                ) : null}
               </Stack>
+            </Stack>
 
-              <Tabs
-                value={activeTab}
-                onChange={(_, value) => setActiveTab(value)}
-                variant="scrollable"
-                scrollButtons="auto"
-                allowScrollButtonsMobile
-                sx={{
-                  display: { xs: 'flex', md: 'none' },
-                  minHeight: 34,
-                  mt: 0.25,
-                  '& .MuiTabs-indicator': { height: 2, borderRadius: 2, bgcolor: '#25d366' },
-                  '& .MuiTab-root': {
-                    minHeight: 34,
-                    px: 1.25,
-                    py: 0.5,
-                    minWidth: 'fit-content',
-                    borderRadius: 999,
-                    border: '1px solid #d1d7db',
-                    textTransform: 'none',
-                    fontWeight: 600,
-                    fontSize: '0.78rem',
-                    mr: 0.75,
-                  },
-                  '& .MuiTab-root.Mui-selected': {
-                    color: '#0f172a',
-                    bgcolor: '#86efac',
-                    borderColor: '#25d366',
-                  },
-                }}
-              >
-                {navItems.map((item) => (
-                  <Tab key={item.key} label={item.label} value={item.key} disableRipple />
-                ))}
-              </Tabs>
-            </FilterToolbar>
-
-            {statusError ? <ErrorState message={statusError} /> : null}
-
-            <Box sx={{ minHeight: 0, flex: 1, overflow: 'hidden' }}>
-              <Suspense fallback={<LoadingSkeleton lines={isDesktop ? 9 : 7} />}>
-                {renderSection}
-              </Suspense>
-            </Box>
+            <TextField
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder={searchPlaceholderByTab[activeTab] || 'Search'}
+              size="small"
+              sx={{
+                maxWidth: { lg: 430 },
+                '& .MuiOutlinedInput-root': {
+                  bgcolor: '#fff',
+                  borderRadius: 999,
+                },
+              }}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchRoundedIcon fontSize="small" />
+                  </InputAdornment>
+                ),
+              }}
+            />
           </Stack>
+        </Paper>
+
+        {statusError ? <ErrorState message={statusError} /> : null}
+
+        <Box sx={{ flex: 1, minHeight: 0, p: { xs: 0, lg: 1.5 } }}>
+          <SectionSurface>
+            <Suspense fallback={<LoadingSkeleton lines={isDesktop ? 9 : 7} />}>{sectionNode}</Suspense>
+          </SectionSurface>
         </Box>
-      </SectionCard>
+      </Stack>
+
+      {!isDesktop ? (
+        <Paper sx={{ position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 1300, borderRadius: 0 }} elevation={6}>
+          <BottomNavigation
+            showLabels
+            value={mobileTabValue}
+            onChange={(_, value) => setActiveTab(value)}
+            sx={{
+              height: 66,
+              '& .MuiBottomNavigationAction-root': { minWidth: 0 },
+              '& .MuiBottomNavigationAction-label': { fontSize: '0.68rem' },
+            }}
+          >
+            {mobileTabs.map((item) => (
+              <BottomNavigationAction
+                key={item.key}
+                value={item.key}
+                label={item.label}
+                icon={
+                  item.key === 'inbox' ? (
+                    <Badge color="success" variant="dot">
+                      {item.icon}
+                    </Badge>
+                  ) : (
+                    item.icon
+                  )
+                }
+              />
+            ))}
+          </BottomNavigation>
+        </Paper>
+      ) : null}
+
+      <Menu
+        anchorEl={mobileMenuAnchorEl}
+        open={mobileMenuOpen}
+        onClose={() => setMobileMenuAnchorEl(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+      >
+        <MenuItem disabled sx={{ opacity: '1 !important', alignItems: 'flex-start', py: 1 }}>
+          <ListItemText
+            primary={userName || 'User'}
+            secondary={mobileUserMeta}
+            primaryTypographyProps={{ fontWeight: 700, variant: 'body2' }}
+            secondaryTypographyProps={{ variant: 'caption' }}
+          />
+        </MenuItem>
+        <Divider />
+        <MenuItem disabled sx={{ opacity: '1 !important' }}>
+          <ListItemText
+            primary={isAccountConnected ? 'WhatsApp connected' : 'WhatsApp not connected'}
+            secondary={whatsappAccount?.phone_number || whatsappAccount?.display_phone_number || 'No account selected'}
+            primaryTypographyProps={{ variant: 'caption', color: 'text.secondary' }}
+            secondaryTypographyProps={{ variant: 'caption', color: 'text.secondary' }}
+          />
+        </MenuItem>
+        <MenuItem onClick={() => { handleConnectFlow(); setMobileMenuAnchorEl(null); }}>
+          <ListItemIcon><SettingsRoundedIcon fontSize="small" /></ListItemIcon>
+          <ListItemText primary={isAccountConnected ? 'Reconnect account' : 'Connect account'} />
+        </MenuItem>
+        {isAccountConnected && whatsappAccount?.id ? (
+          <MenuItem onClick={() => { handleDisconnect(whatsappAccount.id); setMobileMenuAnchorEl(null); }}>
+            <ListItemIcon><LogoutRoundedIcon fontSize="small" /></ListItemIcon>
+            <ListItemText primary="Disconnect account" />
+          </MenuItem>
+        ) : null}
+        <Divider />
+        <MenuItem onClick={() => { setActiveTab('settings'); setMobileMenuAnchorEl(null); }}>
+          <ListItemIcon><SettingsRoundedIcon fontSize="small" /></ListItemIcon>
+          <ListItemText primary="Settings" />
+        </MenuItem>
+        <MenuItem onClick={() => { setActiveTab('analytics'); setMobileMenuAnchorEl(null); }}>
+          <ListItemIcon><QueryStatsRoundedIcon fontSize="small" /></ListItemIcon>
+          <ListItemText primary="Analytics" />
+        </MenuItem>
+        <MenuItem disabled sx={{ opacity: '1 !important' }}>
+          <ListItemText primary={lastSyncLabel} primaryTypographyProps={{ variant: 'caption', color: 'text.secondary' }} />
+        </MenuItem>
+        <Divider />
+        <MenuItem onClick={() => { setMobileMenuAnchorEl(null); outletContext.onLogout?.(); }}>
+          <ListItemIcon><LogoutRoundedIcon fontSize="small" /></ListItemIcon>
+          <ListItemText primary="Logout" />
+        </MenuItem>
+      </Menu>
     </Box>
   );
 }

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Box, Paper, Stack, Typography } from '@mui/material';
 import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { whatsappCloudService } from '../../services/whatsappCloudService';
 import EmptyState from './EmptyState';
@@ -9,7 +10,12 @@ const getTs = (item) => new Date(item?.timestamp || item?.createdAt || item?.tim
 const getTextType = (item) => String(item?.status || '').toLowerCase();
 
 function SummaryCard({ title, value }) {
-  return <article className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm"><p className="text-sm font-medium text-gray-500">{title}</p><p className="mt-2 text-3xl font-semibold text-gray-900">{formatNumber(value)}</p></article>;
+  return (
+    <Paper variant="outlined" sx={{ p: 2, borderRadius: 3 }}>
+      <Typography variant="body2" color="text.secondary">{title}</Typography>
+      <Typography variant="h4" fontWeight={700} sx={{ mt: 1 }}>{formatNumber(value)}</Typography>
+    </Paper>
+  );
 }
 
 export default function AnalyticsDashboard() {
@@ -27,7 +33,6 @@ export default function AnalyticsDashboard() {
         setLoading(false);
       }
     };
-
     load();
   }, []);
 
@@ -53,56 +58,40 @@ export default function AnalyticsDashboard() {
       if (['read', 'seen'].includes(getTextType(item))) row.read += 1;
       if (!outgoing) row.replies += 1;
     });
-
     return [...days.values()].sort((a, b) => a.day.localeCompare(b.day)).slice(-14);
   }, [messages]);
 
-  if (loading) {
-    return <section className="rounded-xl border border-gray-200 bg-white shadow-sm"><LoadingSkeleton lines={6} /></section>;
-  }
-
-  if (!messages.length) {
-    return <section className="rounded-xl border border-gray-200 bg-white shadow-sm"><EmptyState title="No Data Available" description="Analytics will appear once WhatsApp message data is available." /></section>;
-  }
+  if (loading) return <Paper variant="outlined" sx={{ borderRadius: 3 }}><LoadingSkeleton lines={6} /></Paper>;
+  if (!messages.length) return <Paper variant="outlined" sx={{ borderRadius: 3 }}><EmptyState title="No Data Available" description="Analytics will appear once WhatsApp message data is available." /></Paper>;
 
   return (
-    <section className="space-y-5" aria-label="Analytics Dashboard">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <SummaryCard title="Messages Sent" value={metrics.sent} />
-        <SummaryCard title="Messages Delivered" value={metrics.delivered} />
-        <SummaryCard title="Messages Read" value={metrics.read} />
-        <SummaryCard title="Replies Received" value={metrics.replies} />
-      </div>
+    <Stack spacing={2} sx={{ p: { xs: 1, md: 2 }, height: '100%', overflow: 'auto' }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', lg: 'repeat(4, 1fr)' }, gap: 1.5 }}>
+        <SummaryCard title="Sent" value={metrics.sent} />
+        <SummaryCard title="Delivered" value={metrics.delivered} />
+        <SummaryCard title="Read" value={metrics.read} />
+        <SummaryCard title="Replies" value={metrics.replies} />
+      </Box>
 
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-        <article className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-          <h2 className="mb-3 text-lg font-semibold text-gray-900">Message Trend</h2>
-          <div className="h-72 w-full">
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', xl: '1fr 1fr' }, gap: 2 }}>
+        <Paper variant="outlined" sx={{ p: 2, borderRadius: 3 }}>
+          <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1 }}>Message Trend</Typography>
+          <Box sx={{ height: 290 }}>
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis dataKey="day" /><YAxis /><Tooltip /><Legend />
-                <Line type="monotone" dataKey="sent" stroke="#2563eb" strokeWidth={2} />
-                <Line type="monotone" dataKey="delivered" stroke="#16a34a" strokeWidth={2} />
-              </LineChart>
+              <LineChart data={chartData}><CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" /><XAxis dataKey="day" /><YAxis /><Tooltip /><Legend /><Line type="monotone" dataKey="sent" stroke="#075e54" strokeWidth={2} /><Line type="monotone" dataKey="delivered" stroke="#25d366" strokeWidth={2} /></LineChart>
             </ResponsiveContainer>
-          </div>
-        </article>
+          </Box>
+        </Paper>
 
-        <article className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-          <h2 className="mb-3 text-lg font-semibold text-gray-900">Read & Replies</h2>
-          <div className="h-72 w-full">
+        <Paper variant="outlined" sx={{ p: 2, borderRadius: 3 }}>
+          <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1 }}>Read & Replies</Typography>
+          <Box sx={{ height: 290 }}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis dataKey="day" /><YAxis /><Tooltip /><Legend />
-                <Bar dataKey="read" fill="#22c55e" name="Read" />
-                <Bar dataKey="replies" fill="#f59e0b" name="Replies" />
-              </BarChart>
+              <BarChart data={chartData}><CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" /><XAxis dataKey="day" /><YAxis /><Tooltip /><Legend /><Bar dataKey="read" fill="#22c55e" name="Read" /><Bar dataKey="replies" fill="#f59e0b" name="Replies" /></BarChart>
             </ResponsiveContainer>
-          </div>
-        </article>
-      </div>
-    </section>
+          </Box>
+        </Paper>
+      </Box>
+    </Stack>
   );
 }

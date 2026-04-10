@@ -1,5 +1,16 @@
 import { useMemo, useState } from 'react';
-import { toast } from '../../Components';
+import PropTypes from 'prop-types';
+import {
+  Box,
+  Button,
+  LinearProgress,
+  Paper,
+  Stack,
+  TextField,
+  Typography,
+} from '@mui/material';
+import UploadFileRoundedIcon from '@mui/icons-material/UploadFileRounded';
+import { toast } from '../../Components/Toast';
 import { buildTemplatePayload, whatsappCloudService } from '../../services/whatsappCloudService';
 import TemplateSelector from './TemplateSelector';
 
@@ -9,7 +20,7 @@ const splitNumbers = (rawValue) =>
     .map((item) => item.replace(/[^\d+]/g, '').trim())
     .filter(Boolean);
 
-export default function BulkSender() {
+export default function BulkSender({ standalone, search }) {
   const [numbersText, setNumbersText] = useState('');
   const [template, setTemplate] = useState(null);
   const [isSending, setIsSending] = useState(false);
@@ -20,22 +31,14 @@ export default function BulkSender() {
   const handleCsvUpload = async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
-
     const content = await file.text();
     setNumbersText((prev) => `${prev.trim()}\n${content}`.trim());
     event.target.value = '';
   };
 
   const sendBulkMessages = async () => {
-    if (numbers.length === 0) {
-      toast.error('Please provide at least one recipient number.');
-      return;
-    }
-
-    if (!template?.name || !template?.language) {
-      toast.error('Please select a template first.');
-      return;
-    }
+    if (numbers.length === 0) return void toast.error('Please provide at least one recipient number.');
+    if (!template?.name || !template?.language) return void toast.error('Please select a template first.');
 
     setIsSending(true);
     setProgress({ total: numbers.length, processed: 0, success: 0, failed: 0 });
@@ -45,80 +48,78 @@ export default function BulkSender() {
 
     for (let index = 0; index < numbers.length; index += 1) {
       const to = numbers[index];
-
       try {
         await whatsappCloudService.sendTemplateMessage(
           buildTemplatePayload({
             to,
-            template: {
-              name: template.name,
-              language: template.language,
-              parameters: template.parameters || [],
-            },
+            template: { name: template.name, language: template.language, parameters: template.parameters || [] },
           }),
         );
         success += 1;
-      } catch (error) {
+      } catch {
         failed += 1;
       }
-
-      setProgress({
-        total: numbers.length,
-        processed: index + 1,
-        success,
-        failed,
-      });
+      setProgress({ total: numbers.length, processed: index + 1, success, failed });
     }
 
-    if (failed > 0) {
-      toast.error(`${failed} message(s) failed. ${success} sent successfully.`);
-    } else {
-      toast.success(`Bulk send completed. ${success} messages sent.`);
-    }
+    failed > 0
+      ? toast.error(`${failed} message(s) failed. ${success} sent successfully.`)
+      : toast.success(`Bulk send completed. ${success} messages sent.`);
 
     setIsSending(false);
   };
 
   return (
-    <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-      <h3 className="text-lg font-semibold text-gray-800">Bulk Messaging</h3>
+    <Paper variant="outlined" sx={{ p: 2.5, borderRadius: standalone ? 0 : 3 }}>
+      <Stack spacing={2}>
+        <Box>
+          <Typography variant="h6" fontWeight={700}>Broadcast Campaign</Typography>
+          <Typography variant="body2" color="text.secondary">Send approved templates to multiple recipients.</Typography>
+        </Box>
 
-      <div className="mt-4 space-y-4">
-        <label className="block text-sm text-gray-700">
-          Recipient Numbers (one per line or comma separated)
-          <textarea
-            rows={4}
-            disabled={isSending}
-            value={numbersText}
-            onChange={(event) => setNumbersText(event.target.value)}
-            className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-            placeholder={'+14155552671\n+14155552672'}
-          />
-        </label>
+        <TextField
+          multiline
+          rows={5}
+          disabled={isSending}
+          value={numbersText}
+          onChange={(event) => setNumbersText(event.target.value)}
+          label="Recipient numbers"
+          helperText="One number per line or comma separated"
+          placeholder={'+14155552671\n+14155552672'}
+        />
 
-        <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-blue-700">
-          <input type="file" accept=".csv,text/csv" className="hidden" onChange={handleCsvUpload} />
-          <span className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5">Upload CSV</span>
-        </label>
+        <Button component="label" variant="outlined" startIcon={<UploadFileRoundedIcon />} sx={{ width: 'fit-content' }}>
+          Upload CSV
+          <input type="file" accept=".csv,text/csv" hidden onChange={handleCsvUpload} />
+        </Button>
 
-        <TemplateSelector selectedTemplate={template} onTemplateChange={setTemplate} disabled={isSending} />
+        <TemplateSelector selectedTemplate={template} onTemplateChange={setTemplate} disabled={isSending} searchQuery={search} />
 
-        <button
-          type="button"
-          onClick={sendBulkMessages}
-          disabled={isSending || numbers.length === 0}
-          className="rounded-lg bg-green-600 px-4 py-2.5 font-medium text-white disabled:opacity-60"
-        >
-          {isSending ? 'Sending Bulk...' : 'Send Bulk Template'}
-        </button>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25} alignItems={{ sm: 'center' }}>
+          <Button variant="contained" onClick={sendBulkMessages} disabled={isSending || numbers.length === 0}>
+            {isSending ? 'Sending Broadcast…' : 'Send Broadcast'}
+          </Button>
+          <Typography variant="caption" color="text.secondary">Recipients: {numbers.length}</Typography>
+        </Stack>
 
-        <div className="rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-700">
-          <p>Total: <strong>{progress.total}</strong></p>
-          <p>Processed: <strong>{progress.processed}</strong></p>
-          <p>Success: <strong className="text-green-700">{progress.success}</strong></p>
-          <p>Failed: <strong className="text-red-700">{progress.failed}</strong></p>
-        </div>
-      </div>
-    </section>
+        {isSending ? <LinearProgress variant="determinate" value={(progress.processed / Math.max(progress.total, 1)) * 100} /> : null}
+
+        <Stack direction="row" spacing={2} flexWrap="wrap">
+          <Typography variant="body2">Total: <strong>{progress.total}</strong></Typography>
+          <Typography variant="body2">Processed: <strong>{progress.processed}</strong></Typography>
+          <Typography variant="body2" color="success.main">Success: <strong>{progress.success}</strong></Typography>
+          <Typography variant="body2" color="error.main">Failed: <strong>{progress.failed}</strong></Typography>
+        </Stack>
+      </Stack>
+    </Paper>
   );
 }
+
+BulkSender.propTypes = {
+  standalone: PropTypes.bool,
+  search: PropTypes.string,
+};
+BulkSender.defaultProps = {
+  standalone: false,
+  search: '',
+};
