@@ -202,14 +202,5 @@ export function useAutoReplyManagement() {
     handleDelete,
     handleToggle,
     handleTest,
-    handleImportRules: async (rulesToImport) => {
-      try {
-        await whatsappCloudService.importAutoReplyRules(rulesToImport);
-        await loadAutoReplyRules();
-        toast.success(`${rulesToImport.length} rule(s) imported.`);
-      } catch (error) {
-        toast.error(parseApiError(error, 'Failed to import rules.'));
-      }
-    },
   };
 }

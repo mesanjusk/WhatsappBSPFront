@@ -205,15 +205,6 @@ export const deleteAutoReplyRule = (id) =>
 export const toggleAutoReplyRule = (id) =>
   apiClient.patch(`/api/whatsapp/auto-reply/${id}/toggle`);
 
-export const importAutoReplyRules = (rules) =>
-  tryAutoReplyEndpoints((endpoint) =>
-    apiClient.post(`${endpoint}/import`, { rules }, {
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    })
-  );
-
 
 export const fetchManagedUsers = () => apiClient.get('/api/users/manage');
 export const createManagedUser = (payload) =>

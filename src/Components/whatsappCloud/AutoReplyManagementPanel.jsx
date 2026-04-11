@@ -18,7 +18,7 @@ import {
 import PropTypes from 'prop-types';
 import Modal from '../common/Modal';
 import { parseApiError } from '../../utils/parseApiError';
-import { parseAutoReplyRulesFromRows, parsePriceCatalogRows, parseTabularFile } from '../../utils/importParsers';
+import { parsePriceCatalogRows, parseTabularFile } from '../../utils/importParsers';
 import { toast } from '../../Components/Toast';
 import { useAutoReplyManagement } from './hooks/useAutoReplyManagement';
 
@@ -44,28 +44,12 @@ export default function AutoReplyManagementPanel({ search }) {
     handleDelete,
     handleToggle,
     handleTest,
-    handleImportRules,
   } = useAutoReplyManagement();
 
   const normalizedSearch = search.trim().toLowerCase();
   const filteredRules = normalizedSearch
     ? rules.filter((rule) => `${rule.keyword} ${rule.replyText} ${rule.templateName} ${rule.templateLanguage} ${rule.menuTitle}`.toLowerCase().includes(normalizedSearch))
     : rules;
-
-  const handleRulesImport = async (event) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    try {
-      const rows = await parseTabularFile(file);
-      const parsedRules = parseAutoReplyRulesFromRows(rows);
-      if (!parsedRules.length) return toast.error('No valid rules found in the uploaded file.');
-      await handleImportRules(parsedRules);
-    } catch (error) {
-      toast.error(parseApiError(error, 'Could not import rule file.'));
-    } finally {
-      event.target.value = '';
-    }
-  };
 
   const handleCatalogUpload = async (event) => {
     const file = event.target.files?.[0];
@@ -102,11 +86,7 @@ export default function AutoReplyManagementPanel({ search }) {
         </Stack>
         {testResult ? <Typography variant="body2">Reply: <strong>{testResult}</strong></Typography> : null}
 
-        <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="flex-end" spacing={1}>
-          <Button component="label" variant="outlined">
-            Import Rules CSV / Excel
-            <input type="file" accept=".csv,.xlsx,.xls" hidden onChange={handleRulesImport} />
-          </Button>
+        <Stack direction="row" justifyContent="flex-end">
           <Button variant="contained" onClick={openAddModal}>Add Rule</Button>
         </Stack>
 
