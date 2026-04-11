@@ -17,6 +17,9 @@ import {
 } from '@mui/material';
 import PropTypes from 'prop-types';
 import Modal from '../common/Modal';
+import { parseApiError } from '../../utils/parseApiError';
+import { parsePriceCatalogRows, parseTabularFile } from '../../utils/importParsers';
+import { toast } from '../../Components/Toast';
 import { useAutoReplyManagement } from './hooks/useAutoReplyManagement';
 
 export default function AutoReplyManagementPanel({ search }) {
@@ -42,11 +45,27 @@ export default function AutoReplyManagementPanel({ search }) {
     handleToggle,
     handleTest,
   } = useAutoReplyManagement();
+
   const normalizedSearch = search.trim().toLowerCase();
   const filteredRules = normalizedSearch
-    ? rules.filter((rule) =>
-      `${rule.keyword} ${rule.replyText} ${rule.templateName} ${rule.templateLanguage}`.toLowerCase().includes(normalizedSearch))
+    ? rules.filter((rule) => `${rule.keyword} ${rule.replyText} ${rule.templateName} ${rule.templateLanguage} ${rule.menuTitle}`.toLowerCase().includes(normalizedSearch))
     : rules;
+
+  const handleCatalogUpload = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      const rows = await parseTabularFile(file);
+      const catalogRows = parsePriceCatalogRows(rows);
+      if (!catalogRows.length) return toast.error('No valid price rows found in the uploaded file.');
+      setFormData((prev) => ({ ...prev, catalogRows, catalogSummary: `${catalogRows.length} products loaded` }));
+      toast.success(`${catalogRows.length} price rows loaded.`);
+    } catch (error) {
+      toast.error(parseApiError(error, 'Could not read the price list file.'));
+    } finally {
+      event.target.value = '';
+    }
+  };
 
   return (
     <Paper variant="outlined" sx={{ p: 2.5, borderRadius: { xs: 0, md: 3 }, height: '100%', overflow: 'auto' }}>
@@ -54,26 +73,15 @@ export default function AutoReplyManagementPanel({ search }) {
         <Stack direction="row" justifyContent="space-between" spacing={1}>
           <Box>
             <Typography variant="h6" fontWeight={700}>Auto Reply Rules</Typography>
-            <Typography variant="body2" color="text.secondary">Backend-driven keyword and template automations.</Typography>
+            <Typography variant="body2" color="text.secondary">Text/template rules plus product-price catalog automation.</Typography>
           </Box>
           <Button variant="outlined" onClick={loadAutoReplyRules}>Refresh</Button>
         </Stack>
 
-        <TextField
-          multiline
-          rows={2}
-          label="Fallback reply preview"
-          value={fallbackReply}
-          onChange={(event) => setFallbackReply(event.target.value)}
-        />
+        <TextField multiline rows={2} label="Fallback reply preview" value={fallbackReply} onChange={(event) => setFallbackReply(event.target.value)} />
 
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-          <TextField
-            value={testInput}
-            onChange={(event) => setTestInput(event.target.value)}
-            placeholder="Simulate incoming message"
-            fullWidth
-          />
+          <TextField value={testInput} onChange={(event) => setTestInput(event.target.value)} placeholder="Simulate incoming message" fullWidth />
           <Button variant="contained" onClick={handleTest}>Test</Button>
         </Stack>
         {testResult ? <Typography variant="body2">Reply: <strong>{testResult}</strong></Typography> : null}
@@ -87,28 +95,28 @@ export default function AutoReplyManagementPanel({ search }) {
             <TableHead>
               <TableRow>
                 <TableCell>Keyword</TableCell>
+                <TableCell>Type</TableCell>
                 <TableCell>Reply</TableCell>
                 <TableCell>Status</TableCell>
                 <TableCell align="right">Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {isLoading ? (
-                <TableRow><TableCell colSpan={4} align="center">Loading rules...</TableCell></TableRow>
-              ) : null}
-              {!isLoading && filteredRules.length === 0 ? (
-                <TableRow><TableCell colSpan={4} align="center">No auto-reply rules configured.</TableCell></TableRow>
-              ) : filteredRules.map((rule) => (
+              {isLoading ? <TableRow><TableCell colSpan={5} align="center">Loading rules...</TableCell></TableRow> : null}
+              {!isLoading && filteredRules.length === 0 ? <TableRow><TableCell colSpan={5} align="center">No auto-reply rules configured.</TableCell></TableRow> : null}
+              {!isLoading && filteredRules.map((rule) => (
                 <TableRow key={rule.id}>
                   <TableCell>{rule.keyword} <Typography component="span" variant="caption">({rule.matchType})</Typography></TableCell>
-                  <TableCell>{rule.replyMode === 'template' ? `Template: ${rule.templateName} · ${rule.templateLanguage}` : rule.replyText}</TableCell>
+                  <TableCell>{rule.ruleType === 'product_catalog' ? 'Catalog' : 'Keyword'}</TableCell>
                   <TableCell>
-                    <Chip
-                      label={rule.active ? 'Active' : 'Inactive'}
-                      color={rule.active ? 'success' : 'default'}
-                      size="small"
-                      onClick={() => handleToggle(rule.id)}
-                    />
+                    {rule.ruleType === 'product_catalog'
+                      ? `${rule.catalogRows.length} products`
+                      : rule.replyMode === 'template'
+                      ? `Template: ${rule.templateName} · ${rule.templateLanguage}`
+                      : rule.replyText}
+                  </TableCell>
+                  <TableCell>
+                    <Chip label={rule.active ? 'Active' : 'Inactive'} color={rule.active ? 'success' : 'default'} size="small" onClick={() => handleToggle(rule.id)} />
                   </TableCell>
                   <TableCell align="right">
                     <Stack direction="row" spacing={1} justifyContent="flex-end">
@@ -126,43 +134,45 @@ export default function AutoReplyManagementPanel({ search }) {
       {isModalOpen ? (
         <Modal onClose={() => setIsModalOpen(false)} title={editingRule ? 'Edit Rule' : 'Add Rule'}>
           <Stack component="form" onSubmit={handleSaveRule} spacing={1.5}>
-            <TextField label="Keyword" value={formData.keyword} onChange={(event) => setFormData((prev) => ({ ...prev, keyword: event.target.value }))} />
+            <TextField select label="Rule Type" value={formData.ruleType} onChange={(event) => setFormData((prev) => ({ ...prev, ruleType: event.target.value }))}>
+              <MenuItem value="keyword">Keyword Reply</MenuItem>
+              <MenuItem value="product_catalog">Product Catalog / Price List</MenuItem>
+            </TextField>
+            <TextField label="Keyword" value={formData.keyword} onChange={(event) => setFormData((prev) => ({ ...prev, keyword: event.target.value }))} helperText={formData.ruleType === 'product_catalog' ? 'Example: price, rate, catalog' : ''} />
             <TextField select label="Match Type" value={formData.matchType} onChange={(event) => setFormData((prev) => ({ ...prev, matchType: event.target.value }))}>
               <MenuItem value="contains">Contains</MenuItem>
               <MenuItem value="exact">Exact</MenuItem>
               <MenuItem value="starts_with">Starts with</MenuItem>
             </TextField>
-            <TextField
-              select
-              label="Reply Mode"
-              value={formData.replyMode}
-              onChange={(event) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  replyMode: event.target.value,
-                  templateName: event.target.value === 'template' ? prev.templateName : '',
-                  replyText: event.target.value === 'text' ? prev.replyText : '',
-                }))
-              }
-            >
-              <MenuItem value="text">Reply Text</MenuItem>
-              <MenuItem value="template">Reply Template</MenuItem>
-            </TextField>
-            {formData.replyMode === 'text' ? (
-              <TextField multiline rows={3} label="Reply" value={formData.replyText} onChange={(event) => setFormData((prev) => ({ ...prev, replyText: event.target.value }))} />
+
+            {formData.ruleType === 'keyword' ? (
+              <>
+                <TextField select label="Reply Mode" value={formData.replyMode} onChange={(event) => setFormData((prev) => ({ ...prev, replyMode: event.target.value }))}>
+                  <MenuItem value="text">Reply Text</MenuItem>
+                  <MenuItem value="template">Reply Template</MenuItem>
+                </TextField>
+                {formData.replyMode === 'text' ? (
+                  <TextField multiline rows={3} label="Reply" value={formData.replyText} onChange={(event) => setFormData((prev) => ({ ...prev, replyText: event.target.value }))} />
+                ) : (
+                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+                    <TextField label="Template Name" value={formData.templateName} onChange={(event) => setFormData((prev) => ({ ...prev, templateName: event.target.value }))} fullWidth />
+                    <TextField label="Language" value={formData.templateLanguage} onChange={(event) => setFormData((prev) => ({ ...prev, templateLanguage: event.target.value }))} fullWidth />
+                  </Stack>
+                )}
+              </>
             ) : (
-              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
-                <TextField label="Template Name" value={formData.templateName} onChange={(event) => setFormData((prev) => ({ ...prev, templateName: event.target.value }))} fullWidth />
-                <TextField label="Language" value={formData.templateLanguage} onChange={(event) => setFormData((prev) => ({ ...prev, templateLanguage: event.target.value }))} fullWidth />
-              </Stack>
+              <>
+                <TextField label="Menu Title" value={formData.menuTitle} onChange={(event) => setFormData((prev) => ({ ...prev, menuTitle: event.target.value }))} />
+                <TextField multiline rows={2} label="Menu Intro" value={formData.menuIntro} onChange={(event) => setFormData((prev) => ({ ...prev, menuIntro: event.target.value }))} />
+                <Button component="label" variant="outlined" sx={{ width: 'fit-content' }}>
+                  Upload price list (CSV / Excel)
+                  <input type="file" accept=".csv,.xlsx,.xls" hidden onChange={handleCatalogUpload} />
+                </Button>
+                {formData.catalogSummary ? <Typography variant="body2">{formData.catalogSummary}</Typography> : null}
+              </>
             )}
-            <TextField
-              type="number"
-              label="Delay Seconds"
-              inputProps={{ min: 0, max: 30 }}
-              value={formData.delaySeconds}
-              onChange={(event) => setFormData((prev) => ({ ...prev, delaySeconds: event.target.value }))}
-            />
+
+            <TextField type="number" label="Delay Seconds" inputProps={{ min: 0, max: 30 }} value={formData.delaySeconds} onChange={(event) => setFormData((prev) => ({ ...prev, delaySeconds: event.target.value }))} />
             <FormControlLabel control={<Switch checked={formData.active} onChange={(event) => setFormData((prev) => ({ ...prev, active: event.target.checked }))} />} label="Active" />
             <Stack direction="row" justifyContent="flex-end" spacing={1}>
               <Button type="button" onClick={() => setIsModalOpen(false)} variant="outlined">Cancel</Button>
