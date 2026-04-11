@@ -34,6 +34,7 @@ import RefreshRoundedIcon from '@mui/icons-material/RefreshRounded';
 import ChatRoundedIcon from '@mui/icons-material/ChatRounded';
 import DescriptionRoundedIcon from '@mui/icons-material/DescriptionRounded';
 import CampaignRoundedIcon from '@mui/icons-material/CampaignRounded';
+import PeopleAltRoundedIcon from '@mui/icons-material/PeopleAltRounded';
 import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
 import QueryStatsRoundedIcon from '@mui/icons-material/QueryStatsRounded';
 import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded';
@@ -56,6 +57,7 @@ const MessagesPanel = lazy(() => import('../Components/whatsappCloud/MessagesPan
 const SendMessagePanel = lazy(() => import('../Components/whatsappCloud/SendMessagePanel'));
 const BulkSender = lazy(() => import('../Components/whatsappCloud/BulkSender'));
 const AutoReplyManagementPanel = lazy(() => import('../Components/whatsappCloud/AutoReplyManagementPanel'));
+const CRMPanel = lazy(() => import('../Components/whatsappCloud/CRMPanel'));
 const AnalyticsDashboard = lazy(() => import('../Components/whatsappCloud/AnalyticsDashboard'));
 const WhatsAppAttendanceSettings = lazy(() => import('../Components/whatsappCloud/WhatsAppAttendanceSettings'));
 const AdminUserManagementPanel = lazy(() => import('../Components/whatsappCloud/AdminUserManagementPanel'));
@@ -64,6 +66,7 @@ const navItems = [
   { key: 'inbox', label: 'Chats', icon: <ChatRoundedIcon /> },
   { key: 'templates', label: 'Templates', icon: <DescriptionRoundedIcon /> },
   { key: 'campaigns', label: 'Broadcast', icon: <CampaignRoundedIcon /> },
+  { key: 'crm', label: 'CRM', icon: <PeopleAltRoundedIcon /> },
   { key: 'autoReply', label: 'Auto Reply', icon: <AutoAwesomeRoundedIcon /> },
   { key: 'analytics', label: 'Analytics', icon: <QueryStatsRoundedIcon /> },
   { key: 'settings', label: 'Settings', icon: <SettingsRoundedIcon /> },
@@ -75,6 +78,7 @@ const searchPlaceholderByTab = {
   inbox: 'Search or start new chat',
   templates: 'Search templates',
   campaigns: 'Search broadcasts',
+  crm: 'Search contacts',
   autoReply: 'Search auto replies',
   analytics: 'Search analytics',
   settings: 'Search settings',
@@ -356,6 +360,7 @@ export default function WhatsAppCloudDashboard() {
     if (activeTab === 'inbox') return <MessagesPanel search={search} />;
     if (activeTab === 'templates') return <SendMessagePanel search={search} />;
     if (activeTab === 'campaigns') return <BulkSender standalone search={search} />;
+    if (activeTab === 'crm') return <CRMPanel search={search} />;
     if (activeTab === 'autoReply') return <AutoReplyManagementPanel search={search} />;
     if (activeTab === 'analytics') return <AnalyticsDashboard />;
     return (

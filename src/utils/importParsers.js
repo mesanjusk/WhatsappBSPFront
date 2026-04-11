@@ -83,3 +83,33 @@ export const parsePriceCatalogRows = (rows = []) => {
 
   return cleaned.filter((row) => row['Item Name'] && row.rate);
 };
+
+
+export const parseAutoReplyRulesFromRows = (rows = []) =>
+  (Array.isArray(rows) ? rows : [])
+    .map((row) => {
+      const normalized = Object.fromEntries(
+        Object.entries(row || {}).map(([key, value]) => [normalizeKey(key).toLowerCase(), value])
+      );
+
+      const keyword = String(normalized.keyword || normalized.trigger || '').trim();
+      const ruleType = String(normalized.ruletype || normalized['rule type'] || normalized.type || 'keyword').trim().toLowerCase();
+      const replyType = String(normalized.replytype || normalized['reply type'] || normalized.mode || 'text').trim().toLowerCase();
+      const reply = String(normalized.reply || normalized.replytext || normalized.message || normalized.templatename || '').trim();
+      const templateLanguage = String(normalized.templatelanguage || normalized.language || 'en_US').trim() || 'en_US';
+      const matchType = String(normalized.matchtype || normalized['match type'] || 'contains').trim().toLowerCase();
+      const activeRaw = String(normalized.isactive || normalized.active || 'true').trim().toLowerCase();
+      const delayRaw = normalized.delayseconds ?? normalized['delay seconds'] ?? normalized.delay ?? '';
+
+      return {
+        keyword,
+        ruleType: ruleType === 'product_catalog' ? 'product_catalog' : 'keyword',
+        replyType: replyType === 'template' ? 'template' : 'text',
+        reply,
+        templateLanguage,
+        matchType: ['exact', 'contains', 'starts_with'].includes(matchType) ? matchType : 'contains',
+        isActive: !['false', '0', 'no', 'inactive'].includes(activeRaw),
+        delaySeconds: delayRaw === '' ? null : Number(delayRaw),
+      };
+    })
+    .filter((item) => item.keyword && (item.ruleType === 'product_catalog' || item.reply));

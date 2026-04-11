@@ -65,6 +65,8 @@ export default function MessagesPanel({ search: externalSearch }) {
   const [readCutoffByConversation, setReadCutoffByConversation] = useState({});
   const [showConversationList, setShowConversationList] = useState(true);
   const [draftConversation, setDraftConversation] = useState(null);
+  const [contacts, setContacts] = useState([]);
+  const [customerLoadError, setCustomerLoadError] = useState('');
   const messagesContainerRef = useRef(null);
   const activeConversationIdRef = useRef('');
 
@@ -101,7 +103,17 @@ export default function MessagesPanel({ search: externalSearch }) {
     }
   }, []);
 
-  useEffect(() => { loadMessages(); }, [loadMessages]);
+  const loadContacts = useCallback(async () => {
+    try {
+      const response = await whatsappCloudService.getContacts();
+      setContacts(Array.isArray(response?.data?.data) ? response.data.data : []);
+      setCustomerLoadError('');
+    } catch (error) {
+      setCustomerLoadError(parseApiError(error, 'Could not load contacts.'));
+    }
+  }, []);
+
+  useEffect(() => { loadMessages(); loadContacts(); }, [loadMessages, loadContacts]);
   useEffect(() => {
     if (!SOCKET_URL || typeof io !== 'function') return undefined;
     const socket = io(SOCKET_URL, { transports: ['polling'], reconnection: true, reconnectionAttempts: 5, reconnectionDelay: 2000 });
@@ -129,7 +141,8 @@ export default function MessagesPanel({ search: externalSearch }) {
       const contact = getContactForMessage(message);
       const conversationId = normalizeConversationKey(contact);
       if (!conversationId) return;
-      const existing = map.get(conversationId) || { id: conversationId, contact, displayName: contact, secondaryLabel: contact, customerName: contact, customerMobile: contact, lastMessage: '', lastTimestamp: null, lastUserMessageAt: null, unreadCount: 0 };
+      const matchedContact = contacts.find((item) => normalizeConversationKey(item?.phone) === conversationId);
+      const existing = map.get(conversationId) || { id: conversationId, contact, displayName: matchedContact?.name || contact, secondaryLabel: matchedContact?.name ? contact : contact, customerName: matchedContact?.name || contact, customerMobile: contact, lastMessage: '', lastTimestamp: null, lastUserMessageAt: null, unreadCount: 0 };
       const timestamp = getTimestampRaw(message);
       const tsMs = getMessageTimestampMs(message);
       if (!existing.lastTimestamp || tsMs >= parseTimestampMs(existing.lastTimestamp)) {
@@ -152,7 +165,7 @@ export default function MessagesPanel({ search: externalSearch }) {
       rows.unshift({ ...draftConversation, lastMessage: 'Start conversation', lastTimestamp: new Date().toISOString(), unreadCount: 0, lastUserMessageAt: null });
     }
     return rows.sort((a, b) => parseTimestampMs(b.lastTimestamp) - parseTimestampMs(a.lastTimestamp));
-  }, [activeConversationId, draftConversation, orderedMessages, readCutoffByConversation]);
+  }, [activeConversationId, contacts, draftConversation, orderedMessages, readCutoffByConversation]);
 
   const filteredConversations = useMemo(() => {
     const searchValue = externalSearch.trim().toLowerCase();
@@ -168,6 +181,8 @@ export default function MessagesPanel({ search: externalSearch }) {
   useEffect(() => {
     if (activeConversationId) markConversationAsRead(activeConversationId);
   }, [activeConversationId, markConversationAsRead]);
+
+  const customerOptions = useMemo(() => contacts.map((contact) => ({ id: contact._id || contact.phone, name: contact.name || contact.phone, mobile: contact.phone, mobileDisplay: contact.phone })), [contacts]);
 
   const activeConversation = useMemo(() => conversations.find((item) => item.id === activeConversationId) || null, [conversations, activeConversationId]);
   const activeMessages = useMemo(() => (!activeConversation?.contact ? [] : orderedMessages.filter((message) => normalizeConversationKey(getContactForMessage(message)) === activeConversation.id)), [orderedMessages, activeConversation]);
@@ -221,7 +236,7 @@ export default function MessagesPanel({ search: externalSearch }) {
 
   return (
     <WhatsAppLayout
-      sidebar={<Box sx={{ display: { xs: showConversationList ? 'block' : 'none', lg: 'block' }, height: '100%' }}><ConversationList conversations={filteredConversations} activeConversationId={activeConversationId} onSelectConversation={(id) => { markConversationAsRead(id); setActiveConversationId(id); setShowConversationList(false); }} onRefresh={loadMessages} onSelectCustomer={(value) => { const contact = typeof value === 'string' ? value.trim() : value?.mobile; const conversation = toConversationFromContact({ contact }); if (!conversation.id) return; setDraftConversation(conversation); markConversationAsRead(conversation.id); setActiveConversationId(conversation.id); setShowConversationList(false); }} /></Box>}
+      sidebar={<Box sx={{ display: { xs: showConversationList ? 'block' : 'none', lg: 'block' }, height: '100%' }}><ConversationList conversations={filteredConversations} customerOptions={customerOptions} customerLoadError={customerLoadError} activeConversationId={activeConversationId} onSelectConversation={(id) => { markConversationAsRead(id); setActiveConversationId(id); setShowConversationList(false); }} onRefresh={() => { loadMessages(); loadContacts(); }} onSelectCustomer={(value) => { const contact = typeof value === 'string' ? value.trim() : value?.mobile; const conversation = toConversationFromContact({ contact }); if (!conversation.id) return; setDraftConversation(conversation); markConversationAsRead(conversation.id); setActiveConversationId(conversation.id); setShowConversationList(false); }} /></Box>}
       main={<Box sx={{ display: { xs: showConversationList ? 'none' : 'block', lg: 'block' }, height: '100%', minHeight: 0 }}>{activeConversation ? <Stack sx={{ height: '100%', minHeight: 0 }}><ChatHeader conversation={activeConversation} isLoading={isLoading} onRefresh={loadMessages} windowOpen={conversationWindowOpen} onBack={() => setShowConversationList(true)} /><ChatWindow messages={activeMessages} getMessageIdentity={getMessageIdentity} getMessageDirection={getMessageDirection} getTimestampRaw={getTimestampRaw} scrollRef={messagesContainerRef} canSend={Boolean(activeConversation) && !isSending && conversationWindowOpen} canSendTemplateOnly={is24hExpired} recipient={activeConversation?.contact || ''} onSend={handleSend} onSendAttachment={handleSendAttachment} /></Stack> : <EmptyState title="Select a conversation" description="Choose a chat from the left panel to start messaging." />}</Box>}
       details={activeConversation ? <Stack spacing={2} sx={{ p: 2 }}><Stack alignItems="center" spacing={1}><Avatar sx={{ width: 64, height: 64, bgcolor: '#16a34a' }}>{(activeConversation.displayName || activeConversation.contact || 'NA').slice(0, 2).toUpperCase()}</Avatar><Typography variant="subtitle1" fontWeight={700} align="center">{activeConversation.displayName}</Typography><Typography variant="caption" color="text.secondary" align="center">{activeConversation.secondaryLabel || activeConversation.contact}</Typography></Stack><Divider /><Stack direction="row" spacing={1} alignItems="center"><InfoOutlinedIcon fontSize="small" color="action" /><Typography variant="body2" color="text.secondary">24h window: {conversationWindowOpen ? 'Active' : 'Expired'}</Typography></Stack></Stack> : null}
     />

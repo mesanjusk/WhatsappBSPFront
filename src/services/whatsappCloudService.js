@@ -144,6 +144,14 @@ export const revalidateWhatsAppAccount = (accountId) =>
 
 export const fetchWhatsAppMessages = () => apiClient.get('/api/whatsapp/messages');
 
+
+export const fetchContacts = (params = {}) => apiClient.get('/api/whatsapp/contacts', { params });
+export const createContact = (payload) => apiClient.post('/api/whatsapp/contacts', payload, { headers: { 'Content-Type': 'application/json' } });
+export const updateContact = (id, payload) => apiClient.put(`/api/whatsapp/contacts/${id}`, payload, { headers: { 'Content-Type': 'application/json' } });
+export const importContacts = (contacts) => apiClient.post('/api/whatsapp/contacts/import', { contacts }, { headers: { 'Content-Type': 'application/json' } });
+export const sendWhatsAppBroadcast = (payload) => apiClient.post('/api/whatsapp/broadcast', payload, { headers: { 'Content-Type': 'application/json' } });
+
+
 export const fetchWhatsAppTemplates = () => apiClient.get('/api/whatsapp/templates');
 
 export const sendWhatsAppTextMessage = (payload) =>
@@ -196,6 +204,15 @@ export const deleteAutoReplyRule = (id) =>
 
 export const toggleAutoReplyRule = (id) =>
   apiClient.patch(`/api/whatsapp/auto-reply/${id}/toggle`);
+
+export const importAutoReplyRules = (rules) =>
+  tryAutoReplyEndpoints((endpoint) =>
+    apiClient.post(`${endpoint}/import`, { rules }, {
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    })
+  );
 
 
 export const fetchManagedUsers = () => apiClient.get('/api/users/manage');
@@ -266,6 +283,11 @@ export const whatsappCloudService = {
   sendFlowMessage: sendWhatsAppFlowMessage,
   sendMediaMessage: sendWhatsAppMediaMessage,
   getMessages: fetchWhatsAppMessages,
+  getContacts: fetchContacts,
+  createContact,
+  updateContact,
+  importContacts,
+  sendBroadcast: sendWhatsAppBroadcast,
   getTemplates: fetchWhatsAppTemplates,
   getStatus: fetchWhatsAppStatus,
   getAccount: fetchWhatsAppAccount,
